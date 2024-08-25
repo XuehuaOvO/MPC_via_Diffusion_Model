@@ -95,10 +95,15 @@ class TrajectoryDatasetBase(Dataset, abc.ABC):
                 task_id += 1
                 n_trajs += len(trajs_free_tmp)
                 trajs_free_l.append(trajs_free_tmp)
-
+        print(f'trajs_free_tmp -- {trajs_free_tmp.shape}')
         trajs_free = torch.cat(trajs_free_l)
+        print(f'trajs_free -- {trajs_free.shape}')
         trajs_free_pos = self.robot.get_position(trajs_free)
-
+        print(f'trajs_free_pos -- {trajs_free_pos.shape}')
+        file = open('trajs_free_pos.txt','w')
+        trajs_free_pos_content = repr(trajs_free_pos)
+        file.write(trajs_free_pos_content)
+        file.close
         if self.include_velocity:
             trajs = trajs_free
         else:
@@ -107,6 +112,7 @@ class TrajectoryDatasetBase(Dataset, abc.ABC):
 
         # task: start and goal state positions [n_trajectories, 2 * state_dim]
         task = torch.cat((trajs_free_pos[..., 0, :], trajs_free_pos[..., -1, :]), dim=-1)
+        print(f'task -- {task.shape}')
         self.fields[self.field_key_task] = task
 
     def normalize_all_data(self, *keys):
@@ -120,6 +126,7 @@ class TrajectoryDatasetBase(Dataset, abc.ABC):
         # -------------------------------- Visualize ---------------------------------
         idxs = self.map_task_id_to_trajectories_id[task_id]
         pos_trajs = self.robot.get_position(self.fields[self.field_key_traj][idxs])
+        # print(f'pos_trajs -- {pos_trajs}')
         start_state_pos = pos_trajs[0][0]
         goal_state_pos = pos_trajs[0][-1]
 

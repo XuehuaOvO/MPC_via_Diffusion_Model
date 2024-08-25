@@ -37,8 +37,8 @@ def experiment(
     # Experiment configuration
     # model_id: str = 'EnvDense2D-RobotPointMass',
     # model_id: str = 'EnvNarrowPassageDense2D-RobotPointMass',
-    # model_id: str = 'EnvSimple2D-RobotPointMass',
-    model_id: str = 'EnvSpheres3D-RobotPanda',
+    model_id: str = 'EnvSimple2D-RobotPointMass',
+    # model_id: str = 'EnvSpheres3D-RobotPanda',
 
     # planner_alg: str = 'diffusion_prior',
     # planner_alg: str = 'diffusion_prior_then_guide',
@@ -112,11 +112,22 @@ def experiment(
         tensor_args=tensor_args
     )
     dataset = train_subset.dataset
+    # print(f'train -- {train_subset}')
+    print(f'dataset -- {len(dataset)}')
+    # file = open('variables.txt','w')
+    # train_subset_content = repr(train_subset)
+    # dataset_content = repr(dataset)
+    # file.write(train_subset + '\n' + dataset + '\n')
+    # file.close
+
     n_support_points = dataset.n_support_points
     env = dataset.env
     robot = dataset.robot
     task = dataset.task
-
+    print(f'n_support_points -- {n_support_points}')
+    print(f'env -- {env}')
+    print(f'robot -- {robot}')
+    print(f'task -- {task}')
     dt = trajectory_duration / n_support_points  # time interval for finite differences
 
     # set robot's dt
@@ -148,6 +159,7 @@ def experiment(
     )
     diffusion_model.eval()
     model = diffusion_model
+    # print(f'Diffusion_Model -- {model}')
 
     freeze_torch_model_params(model)
     model = torch.compile(model)
@@ -179,6 +191,7 @@ def experiment(
     ########
     # normalize start and goal positions
     hard_conds = dataset.get_hard_conditions(torch.vstack((start_state_pos, goal_state_pos)), normalize=True)
+    print(f'hard_conds-- {hard_conds}')
     context = None
 
     ########
@@ -191,6 +204,8 @@ def experiment(
         collision_fields = task.get_collision_fields_extra_objects()
     else:
         collision_fields = task.get_collision_fields()
+    
+    print(f'collision_fields-- {collision_fields}')
 
     for collision_field in collision_fields:
         cost_collision_l.append(
@@ -203,6 +218,7 @@ def experiment(
         )
         weights_grad_cost_l.append(weight_grad_cost_collision)
 
+    print(f'cost_collision_l-- {cost_collision_l}')
     # Cost smoothness
     cost_smoothness_l = [
         CostGPTrajectory(

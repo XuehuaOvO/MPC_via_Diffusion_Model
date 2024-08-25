@@ -84,10 +84,11 @@ def get_dataset(dataset_class=None,
     DatasetClass = getattr(datasets, dataset_class)
     print('\n---------------Loading data')
     full_dataset = DatasetClass(dataset_subdir=dataset_subdir, **kwargs)
-    print(full_dataset)
+    print(f'full_subset -- {full_dataset}')
 
     # split into train and validation
     train_subset, val_subset = random_split(full_dataset, [1-val_set_size, val_set_size])
+    print(f'train_subset -- {train_subset}')
     train_dataloader = DataLoader(train_subset, batch_size=batch_size)
     val_dataloader = DataLoader(val_subset, batch_size=batch_size)
 

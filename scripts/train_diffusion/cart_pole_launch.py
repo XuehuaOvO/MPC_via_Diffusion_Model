@@ -19,10 +19,11 @@ N_SEEDS = 1
 N_EXPS_IN_PARALLEL = 1
 
 N_CORES = N_EXPS_IN_PARALLEL * 4
-MEMORY_SINGLE_JOB = 12000
+# MEMORY_SINGLE_JOB = 12000
+MEMORY_SINGLE_JOB = 1200
 MEMORY_PER_CORE = N_EXPS_IN_PARALLEL * MEMORY_SINGLE_JOB // N_CORES
 PARTITION = 'gpu' if USE_CUDA else 'amd3,amd2,amd'
-GRES = 'gpu:1' if USE_CUDA else None  # gpu:rtx2080:1, gpu:rtx3080:1, gpu:rtx3090:1, gpu:a5000:1
+GRES = 'gpu:0' if USE_CUDA else None  # gpu:0 NVIDIA T1200 (laptop)
 CONDA_ENV = 'mpd'
 
 
@@ -30,7 +31,7 @@ exp_name = f'train_diffusion'
 
 launcher = Launcher(
     exp_name=exp_name,
-    exp_file='train',
+    exp_file='cart_pole_train',
     # project_name='project01234',
     n_seeds=N_SEEDS,
     n_exps_in_parallel=N_EXPS_IN_PARALLEL,
@@ -58,7 +59,7 @@ launcher = Launcher(
 # ]
 
 dataset_subdir_l = [
-    'EnvSimple2D-RobotPointMass'
+    'CartPole-LQR'
 ]
 
 include_velocity_l = [
@@ -74,7 +75,7 @@ variance_schedule_l = [
 ]
 
 n_diffusion_steps_l = [
-    25,
+    5,
 ]
 
 predict_epsilon_l = [
@@ -117,10 +118,14 @@ for dataset_subdir, include_velocity, use_ema, variance_schedule, n_diffusion_st
         lr=lr,
 
         batch_size=batch_size,
-        num_train_steps=500000,
+        # num_train_steps=500000,
+        num_train_steps=50000,
 
-        steps_til_ckpt=50000,
-        steps_til_summary=20000,
+        # steps_til_ckpt=50000,
+        steps_til_ckpt=5000,
+
+        # steps_til_summary=20000,
+        steps_til_summary=2000,
 
         **wandb_options,
         wandb_group=f'{dataset_subdir}-{include_velocity}-{use_ema}-{variance_schedule}-{n_diffusion_steps}-{predict_epsilon}-{unet_dim_mults_option}',

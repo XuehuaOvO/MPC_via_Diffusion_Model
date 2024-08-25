@@ -133,6 +133,7 @@ def generate_collision_free_trajectories(
     if trajs_last_iter_free is None:
         trajs_last_iter_free = torch.empty(0)
     torch.save(trajs_last_iter_free, os.path.join(results_dir, f'trajs-free.pt'))
+    print(trajs_last_iter_free.size())
 
     # save results data dict
     trajs_iters_coll, trajs_iters_free = task.get_trajs_collision_and_free(trajs_iters[-1])
@@ -172,18 +173,18 @@ def generate_collision_free_trajectories(
 @single_experiment_yaml
 def experiment(
     # env_id: str = 'EnvDense2D',
-    # env_id: str = 'EnvSimple2D',
+    env_id: str = 'EnvSimple2D',
     # env_id: str = 'EnvNarrowPassageDense2D',
-    env_id: str = 'EnvSpheres3D',
+    # env_id: str = 'EnvSpheres3D',
 
-    # robot_id: str = 'RobotPointMass',
-    robot_id: str = 'RobotPanda',
+    robot_id: str = 'RobotPointMass',
+    # robot_id: str = 'RobotPanda',
 
     n_support_points: int = 64,
     duration: float = 5.0,  # seconds
 
-    # threshold_start_goal_pos: float = 1.0,
-    threshold_start_goal_pos: float = 1.83,
+    threshold_start_goal_pos: float = 1.0,
+    # threshold_start_goal_pos: float = 1.83,
 
     obstacle_cutoff_margin: float = 0.05,
 
