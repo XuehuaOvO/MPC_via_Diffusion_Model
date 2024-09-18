@@ -39,7 +39,7 @@ class InputsDataset(Dataset, abc.ABC):
         # self.threshold_start_goal_pos = self.args['threshold_start_goal_pos']
 
         self.field_key_inputs = 'inputs'
-        self.field_key_task = 'task'
+        self.field_key_condition = 'condition'
         self.fields = {}
 
         # load data
@@ -57,12 +57,13 @@ class InputsDataset(Dataset, abc.ABC):
 
         # normalize the inputs (for the diffusion model)
         self.normalizer = DatasetNormalizer(self.fields, normalizer=normalizer)
-        self.normalizer_keys = self.field_key_inputs
+        # self.fields[self.field_key_condition] = self.condition
+        self.normalizer_keys = [self.field_key_inputs, self.field_key_condition] # [self.field_key_inputs, self.field_key_task]
         self.normalize_all_data(*self.normalizer_keys)
 
     def load_inputs(self):
         # load training inputs
-        inputs_load = torch.load(os.path.join(self.base_dir, 'u-collecting.pt'),map_location=self.tensor_args['device'])
+        inputs_load = torch.load(os.path.join(self.base_dir, 'u-tensor_6400-8-1.pt'),map_location=self.tensor_args['device'])
         inputs_training = inputs_load
         # self.inputs_dim = inputs_training.shape
         # self.inputs_num = inputs_training.shape
@@ -96,41 +97,24 @@ class InputsDataset(Dataset, abc.ABC):
         #     trajs = trajs_free_pos
         self.fields[self.field_key_inputs] = inputs_training
 
-        # task: goal input: 0
-        task = torch.zeros(1, 1)
-        print(f'task -- {task.shape}')
-        self.fields[self.field_key_task] = task
+        # x0 condition
+        x0_condition =  torch.load(os.path.join(self.base_dir, 'x0-tensor_6400-4.pt'),map_location=self.tensor_args['device'])
+        print(f'condition_list_length -- {len(x0_condition)}')
+        self.fields[self.field_key_condition] = x0_condition
+        print(f'fields -- {len(self.fields)}')
 
     def normalize_all_data(self, *keys):
         for key in keys:
             self.fields[f'{key}_normalized'] = self.normalizer(self.fields[f'{key}'], key)
 
-    # def render(self, task_id=3,
-    #            render_joint_trajectories=False,
-    #            render_robot_trajectories=False,
-    #            **kwargs):
-    #     # -------------------------------- Visualize ---------------------------------
-    #     idxs = self.map_task_id_to_trajectories_id[task_id]
-    #     pos_trajs = self.robot.get_position(self.fields[self.field_key_inputs][idxs])
-    #     # print(f'pos_trajs -- {pos_trajs}')
-    #     start_state_pos = pos_trajs[0][0]
-    #     goal_state_pos = pos_trajs[0][-1]
+    # only normalize data u but not the condition texts
+    def normalize_u_data(self, *keys):
+        for key in keys:
+            if key == self.field_key_inputs:
+                self.fields[f'{key}_normalized'] = self.normalizer(self.fields[f'{key}'], key)
+            else:
+                self.fields[f'{key}_normalized'] = self.fields[f'{key}']
 
-    #     fig1, axs1, fig2, axs2 = [None] * 4
-
-    #     if render_joint_trajectories:
-    #         fig1, axs1 = self.planner_visualizer.plot_joint_space_state_trajectories(
-    #             trajs=pos_trajs,
-    #             pos_start_state=start_state_pos, pos_goal_state=goal_state_pos,
-    #             vel_start_state=torch.zeros_like(start_state_pos), vel_goal_state=torch.zeros_like(goal_state_pos),
-    #         )
-
-    #     if render_robot_trajectories:
-    #         fig2, axs2 = self.planner_visualizer.render_robot_trajectories(
-    #             trajs=pos_trajs, start_state=start_state_pos, goal_state=goal_state_pos,
-    #         )
-
-    #     return fig1, axs1, fig2, axs2
 
     def __repr__(self):
         msg = f'InputsDataset\n' \
@@ -143,18 +127,20 @@ class InputsDataset(Dataset, abc.ABC):
 
     def __getitem__(self, index):
         # Generates one sample of data - one trajectory and tasks
-        field_traj_normalized = f'{self.field_key_inputs}_normalized'
-        field_task_normalized = f'{self.field_key_task}_normalized'
-        traj_normalized = self.fields[field_traj_normalized][index]
-        task_normalized = self.fields[field_task_normalized][index]
+        field_inputs_normalized = f'{self.field_key_inputs}_normalized'
+        field_condition_normalized = f'{self.field_key_condition}_normalized'
+        inputs_normalized = self.fields[field_inputs_normalized][index]
+        # print(f'inputs_training -- {inputs_normalized}')
+        condition_normalized = self.fields[field_condition_normalized][index]
+        # print(f'condition_normalized -- {condition_normalized}')
         data = {
-            field_traj_normalized: traj_normalized,
-            field_task_normalized: task_normalized
+            field_inputs_normalized: inputs_normalized,
+            field_condition_normalized: condition_normalized
         }
 
-        # build hard conditions
-        hard_conds = self.get_hard_conditions(traj_normalized, horizon=len(traj_normalized))
-        data.update({'hard_conds': hard_conds})
+        # # build hard conditions
+        # hard_conds = self.get_hard_conditions(condition_normalized)
+        # data.update({'hard_conds': hard_conds})
 
         return data
 
@@ -186,45 +172,47 @@ class InputsDataset(Dataset, abc.ABC):
     def normalize(self, x, key):
         return self.normalizer.normalize(x, key)
 
-    def unnormalize_trajectories(self, x):
+    def unnormalize_states(self, x):
         return self.unnormalize(x, self.field_key_inputs)
 
-    def normalize_trajectories(self, x):
+    def normalize_states(self, x):
         return self.normalize(x, self.field_key_inputs)
 
-    def unnormalize_tasks(self, x):
-        return self.unnormalize(x, self.field_key_task)
+    def unnormalize_condition(self, x):
+        return self.unnormalize(x, self.field_key_condition)
 
-    def normalize_tasks(self, x):
-        return self.normalize(x, self.field_key_task)
+    def normalize_condition(self, x):
+        return self.normalize(x, self.field_key_condition)
 
 
-# class InputsDataset(InputsDatasetBase):
+# class InputsHardDataset(InputsDatasetBase):
 
-#     def __init__(self, **kwargs):
-#         super().__init__(**kwargs)
+    # def __init__(self, **kwargs):
+    #     super().__init__(**kwargs)
 
-#     def get_hard_conditions(self, traj, horizon=None, normalize=False):
-#         # start and goal positions
-#         start_state_pos = self.robot.get_position(traj[0])
-#         goal_state_pos = self.robot.get_position(traj[-1])
+    # def get_hard_conditions(self, condition):
+        # condition x0
+        # hard_x = condition # dimension 1*4*1
+        # start_state_pos = self.robot.get_position(traj[0])
+        # goal_state_pos = self.robot.get_position(traj[-1])
 
-#         if self.include_velocity:
-#             # If velocities are part of the state, then set them to zero at the beggining and end of a trajectory
-#             start_state = torch.cat((start_state_pos, torch.zeros_like(start_state_pos)), dim=-1)
-#             goal_state = torch.cat((goal_state_pos, torch.zeros_like(goal_state_pos)), dim=-1)
-#         else:
-#             start_state = start_state_pos
-#             goal_state = goal_state_pos
+        # if self.include_velocity:
+        #     # If velocities are part of the state, then set them to zero at the beggining and end of a trajectory
+        #     start_state = torch.cat((start_state_pos, torch.zeros_like(start_state_pos)), dim=-1)
+        #     goal_state = torch.cat((goal_state_pos, torch.zeros_like(goal_state_pos)), dim=-1)
+        # else:
+        #     start_state = start_state_pos
+        #     goal_state = goal_state_pos
 
-#         if normalize:
-#             start_state = self.normalizer.normalize(start_state, key=self.field_key_inputs)
-#             goal_state = self.normalizer.normalize(goal_state, key=self.field_key_inputs)
+        # if normalize:
+        #     hard_x = self.normalizer.normalize(start_state, key=self.field_key_inputs)
+        #     start_state = self.normalizer.normalize(start_state, key=self.field_key_inputs)
+        #     goal_state = self.normalizer.normalize(goal_state, key=self.field_key_inputs)
 
-#         if horizon is None:
-#             horizon = self.n_support_points
-#         hard_conds = {
-#             0: start_state,
-#             horizon - 1: goal_state
-#         }
-#         return hard_conds
+        # if horizon is None:
+        #     horizon = self.n_support_points
+        # hard_conds = {
+        #     hard_x
+            # horizon - 1: goal_state
+        # }
+        # return hard_conds

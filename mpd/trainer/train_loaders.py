@@ -85,12 +85,15 @@ def get_dataset(dataset_class=None,
     print('\n---------------Loading data')
     full_dataset = DatasetClass(dataset_subdir=dataset_subdir, **kwargs)
     print(f'full_subset -- {full_dataset}')
+    print(f'batch_size-- {batch_size}')
 
     # split into train and validation
     train_subset, val_subset = random_split(full_dataset, [1-val_set_size, val_set_size])
     print(f'train_subset -- {train_subset}')
     train_dataloader = DataLoader(train_subset, batch_size=batch_size)
+    print(f'train_dataloader -- {len(train_dataloader)}')
     val_dataloader = DataLoader(val_subset, batch_size=batch_size)
+    print(f'val_dataloader -- {len(val_dataloader)}')
 
     if save_indices:
         # save the indices of training and validation sets (for later evaluation)

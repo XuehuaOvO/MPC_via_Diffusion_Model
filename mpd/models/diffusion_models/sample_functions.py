@@ -15,6 +15,35 @@ def extract(a, t, x_shape):
 
 
 @torch.no_grad()
+def ddpm_cart_pole_sample_fn(
+        model, x, hard_conds, context, t, context_nonmask, context_mask,
+        guide=None,
+        n_guide_steps=1,
+        scale_grad_by_std=False,
+        t_start_guide=torch.inf,
+        noise_std_extra_schedule_fn=None,  # 'linear'
+        debug=False,
+        **kwargs
+):
+    t_single = t[0]
+    if t_single < 0:
+        t = torch.zeros_like(t)
+
+    model_mean, _, model_log_variance = model.p_mean_variance_CFG(x=x, hard_conds=hard_conds, context=context, t=t, 
+                                                                  context_nonmask = context_nonmask, context_mask = context_mask)
+
+    model_log_variance = extract(model.posterior_log_variance_clipped, t, x.shape)
+    # model_std = torch.exp(0.5 * model_log_variance)
+    model_var = torch.exp(model_log_variance)
+
+    # no noise when t == 0
+    noise = torch.randn_like(x)
+    noise[t == 0] = 0
+
+    return model_mean + torch.sqrt(model_var)* noise   # model_mean + torch.sqrt(var)*noise
+
+
+@torch.no_grad()
 def ddpm_sample_fn(
         model, x, hard_conds, context, t,
         guide=None,
@@ -81,3 +110,23 @@ def guide_gradient_steps(
         x = apply_hard_conditioning(x, hard_conds)
 
     return x
+
+# def guide_gradient_steps_cart_pole(
+#     x,
+#     hard_conds=None,
+#     guide=None,
+#     n_guide_steps=1, scale_grad_by_std=False,
+#     model_var=None,
+#     debug=False,
+#     **kwargs
+# ):
+#     for _ in range(n_guide_steps):
+#         grad_scaled = guide(x)
+
+#         if scale_grad_by_std:
+#             grad_scaled = model_var * grad_scaled
+
+#         x = x + grad_scaled
+#         # x = apply_hard_conditioning(x, hard_conds)
+
+#     return x

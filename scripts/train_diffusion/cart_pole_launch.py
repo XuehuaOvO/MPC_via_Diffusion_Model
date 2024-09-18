@@ -27,7 +27,7 @@ GRES = 'gpu:0' if USE_CUDA else None  # gpu:0 NVIDIA T1200 (laptop)
 CONDA_ENV = 'mpd'
 
 
-exp_name = f'train_diffusion'
+exp_name = f'train_diffusion_CartPole'
 
 launcher = Launcher(
     exp_name=exp_name,
@@ -59,11 +59,11 @@ launcher = Launcher(
 # ]
 
 dataset_subdir_l = [
-    'CartPole-LQR'
+    'CartPole-LMPC'
 ]
 
 include_velocity_l = [
-    True
+    False
 ]
 
 use_ema_l = [
@@ -75,7 +75,7 @@ variance_schedule_l = [
 ]
 
 n_diffusion_steps_l = [
-    5,
+    25,
 ]
 
 predict_epsilon_l = [
@@ -85,12 +85,11 @@ predict_epsilon_l = [
 dim = 32
 
 unet_dim_mults_option_l = [
-    0,
-    1
+    0
 ]
 
 
-batch_size = 128
+batch_size = 64
 lr = 3e-4
 
 

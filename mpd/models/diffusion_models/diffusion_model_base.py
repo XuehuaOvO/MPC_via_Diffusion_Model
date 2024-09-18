@@ -17,7 +17,7 @@ from torch.nn import DataParallel
 
 from mpd.models.diffusion_models.helpers import cosine_beta_schedule, Losses, exponential_beta_schedule
 from mpd.models.diffusion_models.sample_functions import extract, apply_hard_conditioning, guide_gradient_steps, \
-    ddpm_sample_fn
+    ddpm_sample_fn, ddpm_cart_pole_sample_fn
 from torch_robotics.torch_utils.torch_timer import TimerCUDA
 from torch_robotics.torch_utils.torch_utils import to_numpy
 
@@ -53,6 +53,8 @@ class GaussianDiffusionModel(nn.Module, ABC):
                  predict_epsilon=False,
                  loss_type='l2',
                  context_model=None,
+                 device = 'cuda',
+                 drop_prob = 0.25,
                  **kwargs):
         super().__init__()
 
@@ -63,6 +65,10 @@ class GaussianDiffusionModel(nn.Module, ABC):
         self.n_diffusion_steps = n_diffusion_steps
 
         self.state_dim = self.model.state_dim
+
+        self.device = device
+
+        self.drop_prob = drop_prob
 
         if variance_schedule == 'cosine':
             betas = cosine_beta_schedule(n_diffusion_steps, s=0.008, a_min=0, a_max=0.999)
@@ -153,6 +159,55 @@ class GaussianDiffusionModel(nn.Module, ABC):
 
         model_mean, posterior_variance, posterior_log_variance = self.q_posterior(x_start=x_recon, x_t=x, t=t)
         return model_mean, posterior_variance, posterior_log_variance
+    
+
+    def p_mean_variance_CFG(self, x, hard_conds, context, t,  context_nonmask, context_mask,):
+
+        x_recon_context = self.predict_start_from_noise(x, t=t, noise=self.model(x, t, context, context_nonmask)) # no mask (use the context)
+        # context_masked = torch.ones(context.size(0),1).to(self.device) #torch.zeros(context.size(0),1).to(device)
+        x_recon_noncontext = self.predict_start_from_noise(x, t=t, noise=self.model(x, t, context, context_mask)) # mask (no context)
+
+        x_recon = (1 + self.w) * x_recon_context - self.w * x_recon_noncontext
+
+        if self.clip_denoised:
+            x_recon.clamp_(-1., 1.)
+        else:
+            assert RuntimeError()
+
+        model_mean, posterior_variance, posterior_log_variance = self.q_posterior(x_start=x_recon, x_t=x, t=t)
+        return model_mean, posterior_variance, posterior_log_variance
+
+
+    @torch.no_grad()
+    def cart_pole_sample_loop(self, shape, hard_conds, context=None, return_chain=False,
+                      sample_fn=ddpm_cart_pole_sample_fn,
+                      n_diffusion_steps_without_noise=0,
+                      **sample_kwargs):
+        device = self.betas.device
+
+        batch_size = shape[0]
+        x = torch.randn(shape, device=device) # initial state(noise) with shape 1*8*1
+        # print(f'random x -- {x}')
+        # x = apply_hard_conditioning(x, hard_conds)
+
+        chain = [x] if return_chain else None
+
+        for i in reversed(range(-n_diffusion_steps_without_noise, self.n_diffusion_steps)):
+            t = make_timesteps(batch_size, i, device)
+            context_nonmask = torch.zeros(context.size(0),1).to(device)
+            context_mask = torch.ones(context.size(0),1).to(device)
+            x = sample_fn(self, x, hard_conds, context, t, context_nonmask, context_mask, **sample_kwargs)
+            # x = apply_hard_conditioning(x, hard_conds)
+
+            if return_chain:
+                chain.append(x)
+
+        if return_chain:
+            chain = torch.stack(chain, dim=1)
+            return x, chain
+
+        return x
+
 
     @torch.no_grad()
     def p_sample_loop(self, shape, hard_conds, context=None, return_chain=False,
@@ -257,6 +312,19 @@ class GaussianDiffusionModel(nn.Module, ABC):
             return x, chain
 
         return x
+    
+    @torch.no_grad()
+    def cart_pole_sample(self, hard_conds, horizon=None, context = None, batch_size=1, ddim=False, **sample_kwargs):
+        '''
+            sample shape: 1*8*1
+        '''
+        horizon = horizon or self.horizon
+        shape = (batch_size, horizon, self.state_dim)
+
+        if ddim:
+            return self.ddim_sample(shape, hard_conds, **sample_kwargs)
+
+        return self.cart_pole_sample_loop(shape, hard_conds, context=context, **sample_kwargs)
 
     @torch.no_grad()
     def conditional_sample(self, hard_conds, horizon=None, batch_size=1, ddim=False, **sample_kwargs):
@@ -283,11 +351,19 @@ class GaussianDiffusionModel(nn.Module, ABC):
         self.model(x, t, context=None)
 
     @torch.no_grad()
+    def warmup_CFG(self, horizon=64, device='cuda', context=None, context_mask = None):
+        shape = (1, horizon, self.state_dim)
+        x = torch.randn(shape, device=device)
+        t = make_timesteps(1, 1, device)
+        self.model(x, t, context=context, context_mask=context_mask)
+
+    @torch.no_grad()
     def run_inference(self, context=None, hard_conds=None, n_samples=1, return_chain=False, **diffusion_kwargs):
         # context and hard_conds must be normalized
         hard_conds = copy(hard_conds)
+        print(f'hard_conds -- {hard_conds}')
         context = copy(context)
-
+        print(f'context -- {context}')
         # repeat hard conditions and contexts for n_samples
         for k, v in hard_conds.items():
             new_state = einops.repeat(v, 'd -> b d', b=n_samples)
@@ -314,6 +390,33 @@ class GaussianDiffusionModel(nn.Module, ABC):
 
         # return the last denoising step
         return trajs_chain_normalized[-1]
+    
+    def run_CFG(self, context=None, hard_conds=None, context_weight = 0.1, n_samples=1, horizon =8, return_chain=False, **diffusion_kwargs):
+        context = copy(context)
+        print(f'context -- {context}')
+        self.w = context_weight
+                
+        # if context is not None:
+        #     context = einops.repeat('d -> b d', b=n_samples)
+
+        # Sample from diffusion model
+        samples, chain = self.cart_pole_sample(
+            hard_conds, horizon, context=context, batch_size=n_samples, return_chain=True, **diffusion_kwargs
+        )
+
+        # chain: [ n_samples x (n_diffusion_steps + 1) x horizon x (state_dim)]
+        # extract normalized trajectories
+        inputs_chain_normalized = chain
+
+        # trajs: [ (n_diffusion_steps + 1) x n_samples x horizon x state_dim ]
+        inputs_chain_normalized = einops.rearrange(inputs_chain_normalized, 'b diffsteps h d -> diffsteps b h d')
+
+        if return_chain:
+            return inputs_chain_normalized
+
+        # return the last denoising step
+        return inputs_chain_normalized[-1]
+
 
     # ------------------------------------------ training ------------------------------------------#
 
@@ -330,17 +433,24 @@ class GaussianDiffusionModel(nn.Module, ABC):
 
     def p_losses(self, x_start, context, t, hard_conds):
         noise = torch.randn_like(x_start)
+        # print(f"noise-- {noise.shape}")
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
-        x_noisy = apply_hard_conditioning(x_noisy, hard_conds)
+        # x_noisy = apply_hard_conditioning(x_noisy, hard_conds)
+        # print(f"x_noisy-- {x_noisy.shape}")
 
         # context model
-        if context is not None:
-            context = self.context_model(context)
+        # if context is not None:
+        #     context = self.context_model(context)
+        
+        # mask context
+        mask_shape = torch.rand(context.size(0),1) 
+        # print(f"mask_shape -- {mask_shape.size()}")
+        context_mask = torch.bernoulli(torch.zeros_like(mask_shape)+self.drop_prob).to(self.device)
 
         # diffusion model
-        x_recon = self.model(x_noisy, t, context)
-        x_recon = apply_hard_conditioning(x_recon, hard_conds)
+        x_recon = self.model(x_noisy, t, context, context_mask)
+        # x_recon = apply_hard_conditioning(x_recon, hard_conds)
 
         assert noise.shape == x_recon.shape
 

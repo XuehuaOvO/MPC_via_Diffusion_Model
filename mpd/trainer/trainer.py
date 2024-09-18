@@ -12,8 +12,11 @@ from tqdm.autonotebook import tqdm
 from torch_robotics.torch_utils.torch_timer import TimerCUDA
 from torch_robotics.torch_utils.torch_utils import dict_to_device, DEFAULT_TENSOR_ARGS, to_numpy
 
+from classifier_free_guidance_pytorch import TextConditioner
+
 
 def get_num_epochs(num_train_steps, batch_size, dataset_len):
+    print(dataset_len)
     return ceil(num_train_steps * batch_size / dataset_len)
 
 
@@ -126,12 +129,14 @@ def train(model=None, train_dataloader=None, epochs=None, lr=None, steps_til_sum
           use_amp=False,
           early_stopper_patience=-1,
           debug=False,
+          text_conditioner = None,
           tensor_args=DEFAULT_TENSOR_ARGS,
           **kwargs
           ):
 
     print(f'\n------- TRAINING STARTED -------\n')
-
+    print("Current CUDA device:", torch.cuda.current_device())
+    print(f"epochs {epochs}")
     ema_model = None
     if use_ema:
         # Exponential moving average model

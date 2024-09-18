@@ -1,29 +1,31 @@
 import os
 import torch
 import wandb
+import git
 
-from experiment_launcher import run_experiment, single_experiment
+from experiment_launcher import single_experiment_yaml, run_experiment
 from mpd import trainer
-from mpd.models import UNET_DIM_MULTS, TemporalUnet
+from mpd.models import UNET_DIM_MULTS, ConditionedTemporalUnet
 from mpd.trainer import get_dataset, get_model, get_loss, get_summary
 from mpd.trainer.trainer import get_num_epochs
 from torch_robotics.torch_utils.seed import fix_random_seed
 from torch_robotics.torch_utils.torch_utils import get_torch_device
 
+# from classifier_free_guidance_pytorch import TextConditioner
+# from classifier_free_guidance_pytorch import classifier_free_guidance_class_decorator
 
-# This decorator creates results_dir as results_dir/seed, and saves the experiment arguments into a file.
-@single_experiment
+@single_experiment_yaml
 def experiment(
     ########################################################################
     # Dataset
-    dataset_subdir: str = 'CartPole-LQR',
-    include_velocity: bool = True,
+    dataset_subdir: str = 'CartPole-LMPC',
+    include_velocity: bool = False,
 
     ########################################################################
     # Diffusion Model
     diffusion_model_class: str = 'GaussianDiffusionModel',
     variance_schedule: str = 'exponential',  # cosine
-    n_diffusion_steps: int = 5,
+    n_diffusion_steps: int = 25,
     predict_epsilon: bool = True,
 
     # Unet
@@ -32,12 +34,12 @@ def experiment(
 
     ########################################################################
     # Loss
-    loss_class: str = 'GaussianDiffusionLoss',
+    loss_class: str = 'GaussianDiffusionCartPoleLoss',
 
     # Training parameters
     batch_size: int = 32,
     lr: float = 1e-4,
-    num_train_steps: int = 50000,
+    num_train_steps: int = 5000, # 50000
 
     use_ema: bool = True,
     use_amp: bool = False,
@@ -81,8 +83,16 @@ def experiment(
         tensor_args=tensor_args
     )
 
+    print(f'train_subset -- {len(train_subset.indices)}')
     dataset = train_subset.dataset
-    print(f'dataset -- {dataset.shape}')
+    print(f'dataset -- {dataset}')
+
+    # # texts
+    # repo = git.Repo('.', search_parent_directories=True)
+    # dataset_base_dir = os.path.join(repo.working_dir, 'data_trajectories')
+    # base_dir = os.path.join(dataset_base_dir, dataset_subdir)
+    # condition_texts = torch.load(os.path.join(base_dir, 'x-collecting_list_6400.pt'),map_location=tensor_args['device'])
+
 
     # Model
     diffusion_configs = dict(
@@ -100,16 +110,28 @@ def experiment(
 
     model = get_model(
         model_class=diffusion_model_class,
-        model=TemporalUnet(**unet_configs),
+        model=ConditionedTemporalUnet(**unet_configs), # TemporalUnet(**unet_configs)
         tensor_args=tensor_args,
         **diffusion_configs,
         **unet_configs
+        # text_condition_type = 'film', 
+        # text_condition_model_types = ('t5'),
+        # text_condition_hidden_dims = (32, 64, 128),
+        # text_condition_cond_drop_prob = 0.25,
     )
 
     # Loss
     loss_fn = val_loss_fn = get_loss(
         loss_class=loss_class
     )
+
+    # text conditioner
+    # text_conditioner = TextConditioner(
+    # model_types = 't5',    
+    # hidden_dims = (32,64,128),
+    # hiddens_channel_first = False,
+    # cond_drop_prob = 0.25  # conditional dropout 20% of the time, must be greater than 0. to unlock classifier free guidance
+    # ).cuda()
 
     # Summary
     # summary_fn = get_summary(
@@ -135,6 +157,7 @@ def experiment(
         use_ema=use_ema,
         use_amp=use_amp,
         debug=debug,
+        #text_conditioner = text_conditioner,
         tensor_args=tensor_args
     )
 
@@ -151,7 +174,7 @@ def experiment(
     #     file.write('Some logs in a log file.\n')
     #     file.write(out_str)
 
-    wandb.log({'seed': seed}, step=1)
+    # wandb.log({'seed': seed}, step=1)
 
 
 if __name__ == '__main__':
