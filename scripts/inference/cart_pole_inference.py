@@ -4,29 +4,29 @@ import casadi as ca
 import control
 import numpy as np
 import os
-import pickle
-from math import ceil
-from pathlib import Path
+# import pickle
+# from math import ceil
+# from pathlib import Path
 
-import einops
+#import einops
 import matplotlib.pyplot as plt
 import torch
 from einops._torch_specific import allow_ops_in_compiled_graph  # requires einops>=0.6.1
 
 from experiment_launcher import single_experiment_yaml, run_experiment
-from mp_baselines.planners.costs.cost_functions import CostCollision, CostComposite, CostGPTrajectory
+# from mp_baselines.planners.costs.cost_functions import CostCollision, CostComposite, CostGPTrajectory
 from mpd.models import ConditionedTemporalUnet, UNET_DIM_MULTS
-from mpd.models.diffusion_models.guides import GuideManagerCartPole
+# from mpd.models.diffusion_models.guides import GuideManagerCartPole
 from mpd.models.diffusion_models.sample_functions import guide_gradient_steps, ddpm_sample_fn, ddpm_cart_pole_sample_fn
 from mpd.trainer import get_dataset, get_model
 from mpd.utils.loading import load_params_from_yaml
-from torch_robotics.robots import RobotPanda
+# from torch_robotics.robots import RobotPanda
 from torch_robotics.torch_utils.seed import fix_random_seed
 from torch_robotics.torch_utils.torch_timer import TimerCUDA
 from torch_robotics.torch_utils.torch_utils import get_torch_device, freeze_torch_model_params
-from torch_robotics.trajectory.metrics import compute_smoothness, compute_path_length, compute_variance_waypoints
-from torch_robotics.trajectory.utils import interpolate_traj_via_points
-from torch_robotics.visualizers.planning_visualizer import PlanningVisualizer
+# from torch_robotics.trajectory.metrics import compute_smoothness, compute_path_length, compute_variance_waypoints
+# from torch_robotics.trajectory.utils import interpolate_traj_via_points
+# from torch_robotics.visualizers.planning_visualizer import PlanningVisualizer
 
 allow_ops_in_compiled_graph()
 
@@ -83,7 +83,7 @@ def cart_pole_dynamics(x, u):
 
 @single_experiment_yaml
 def experiment(
-    ########################################################################################################################
+    #########################################################################################
     # Experiment configuration
     # model_id: str = 'EnvDense2D-RobotPointMass',
     # model_id: str = 'EnvNarrowPassageDense2D-RobotPointMass',
@@ -106,32 +106,32 @@ def experiment(
     weight_grad_cost_collision: float = 1e-2, # 
     weight_grad_cost_smoothness: float = 1e-7,
 
-    factor_num_interpolated_points_for_collision: float = 1.5, # 
+    factor_num_interpolated_points_for_collision: float = 1.5, 
 
     trajectory_duration: float = 5.0,  # currently fixed
 
-    ########################################################################
+    ##############################################################
     device: str = 'cuda',
 
     debug: bool = True,
 
     render: bool = True,
 
-    ########################################################################
+    ##############################################################
     # MANDATORY
     seed: int = 30,
     results_dir: str = 'logs',
     # x0 = None,
-    ########################################################################
+    ##############################################################
     # **kwargs
 ):
-    ########################################################################################################################
+    ##############################################################
     fix_random_seed(seed)
 
     device = get_torch_device(device)
     tensor_args = {'device': device, 'dtype': torch.float32}
 
-    ########################################################################################################################
+    ###############################################################
     print(f'##########################################################################################################')
     print(f'Model -- {model_id}')
     print(f'Algorithm -- {planner_alg}')
@@ -146,7 +146,7 @@ def experiment(
     else:
         raise NotImplementedError
 
-    ########################################################################################################################
+    ################################################################
     # model_dir = os.path.join(TRAINED_MODELS_DIR, model_id)
     model_dir = '/home/xiao/mpd-public/data_trained_models/CartPole-LMPC'
     results_dir = os.path.join(model_dir, 'results_inference', str(seed))
@@ -155,7 +155,7 @@ def experiment(
 
     args = load_params_from_yaml(os.path.join(model_dir, "args.yaml"))
 
-    ########################################################################################################################
+    #################################################################
     # Load dataset with env, robot, task
     train_subset, train_dataloader, val_subset, val_dataloader = get_dataset(
         dataset_class='InputsDataset',
@@ -170,7 +170,7 @@ def experiment(
     print(f'n_support_points -- {n_support_points}')
     print(f'state_dim -- {dataset.state_dim}')
 
-    ########################################################################################################################
+    #################################################################
     # load initial starting state x0
     rng_x = np.linspace(-1,1,10) # 10 x_0 samples
     rng_theta = np.linspace(-np.pi/4,np.pi/4,10) # 10 theta_0 samples
@@ -183,7 +183,7 @@ def experiment(
     rng0 = np.array(rng0,dtype=float)
 
     # one initial state for test
-    test = 64
+    test = 32                                                                            # ++++++++++++++++++ test_num
 
     x_0 = rng0[test,0]
     x_0= round(x_0, 3)
@@ -194,7 +194,7 @@ def experiment(
     #initial context
     x0 = np.array([[x_0 , 0, theta_0, 0]])  # np.array([[x_0 , 0, theta_0, 0]])  
 
-    ##################################################################################################################
+    ##########################################################################
     # sampling loop
     num_loop = 32
     x_track = np.zeros((4, num_loop+1))
@@ -208,10 +208,10 @@ def experiment(
         # print(f'x0 -- {x0.size()}')
         hard_conds = None
         context = dataset.normalize_condition(x0)
-        context_mask  = torch.zeros(context.size(0),1).to(device) # context_mask=1: drop_prob in sampling = 1 and 0
-        context_weight = 9
+        # context_mask  = torch.zeros(context.size(0),1).to(device) # context_mask=1
+        context_weight = 9                                                                # ++++++++++++++++++ weight
 
-        ########################################################################################################################
+        #########################################################################
         # Load prior model
         diffusion_configs = dict(
             variance_schedule=args['variance_schedule'],
@@ -240,7 +240,7 @@ def experiment(
         model = diffusion_model
         # print(f'Diffusion_Model -- {model}')
 
-        freeze_torch_model_params(model)
+        # freeze_torch_model_params(model)
         model = torch.compile(model)
         # model.warmup_CFG(horizon=n_support_points, device=device, context = context, context_mask=context_mask)
 
