@@ -38,6 +38,7 @@ def ddpm_cart_pole_sample_fn(
 
     # no noise when t == 0
     noise = torch.randn_like(x)
+    print(f'noise -- {noise}')
     noise[t == 0] = 0
 
     return model_mean + torch.sqrt(model_var)* noise   # model_mean + torch.sqrt(var)*noise

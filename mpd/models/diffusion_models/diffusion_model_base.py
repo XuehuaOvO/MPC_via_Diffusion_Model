@@ -187,7 +187,7 @@ class GaussianDiffusionModel(nn.Module, ABC):
 
         batch_size = shape[0]
         x = torch.randn(shape, device=device) # initial state(noise) with shape 1*8*1
-        # print(f'random x -- {x}')
+        print(f'random x -- {x}')
         # x = apply_hard_conditioning(x, hard_conds)
 
         chain = [x] if return_chain else None
