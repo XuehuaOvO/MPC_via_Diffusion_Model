@@ -5,6 +5,8 @@ import einops
 import numpy as np
 import torch
 from torch import nn
+import casadi as ca
+import control
 
 from mp_baselines.planners.costs.cost_functions import CostGPTrajectory
 from mp_baselines.planners.costs.factors.mp_priors_multi import MultiMPPrior
@@ -236,6 +238,188 @@ class GuideManagerTrajectoriesWithVelocity(nn.Module):
         return grad
 
 
+class GuideManagerCartPole(nn.Module):
+
+    def __init__(self, x0, Q, R, P, dataset, clip_grad=False, clip_grad_rule='norm', max_grad_norm=1., max_grad_value=0.1,
+                 interpolate_trajectories_for_collision=False,
+                 num_interpolated_points_for_collision=128,
+                 start_state_pos=None,
+                 goal_state_pos=None,
+                 num_steps=100,
+                 robot=None,
+                 n_samples=1,
+                 tensor_args=None,
+                 **kwargs):
+        super().__init__()
+        # self.cost = cost
+        self.dataset = dataset
+        self.x0 = x0
+        self.Q = Q
+        self.R = R
+        self.P = P
+
+        # self.interpolate_trajectories_for_collision = interpolate_trajectories_for_collision
+        # self.num_interpolated_points_for_collision = num_interpolated_points_for_collision
+
+        self.clip_grad = clip_grad
+        self.clip_grad_rule = clip_grad_rule
+        self.max_grad_norm = max_grad_norm
+        self.max_grad_value = max_grad_value
+
+    def forward(self, x_normalized):
+        x = x_normalized.clone()
+        print(f'x_normal -- {x}')
+        with torch.enable_grad():
+            x.requires_grad_(True)
+            
+            # unnormalize x
+            # x is normalized, but the guides are defined on unnormalized trajectory space
+            u = self.dataset.unnormalize_states(x)
+            # u = u.detach().numpy()
+            # print(f'u -- {len(u[0])}')
+
+            # norm of each element in x
+            u_norm = torch.abs(u)
+
+            # if self.interpolate_trajectories_for_collision:
+            #     # finer interpolation of trajectory for better collision avoidance
+            #     x_interpolated = interpolate_points_v1(x, num_interpolated_points=self.num_interpolated_points_for_collision)
+            # else:
+            #     x_interpolated = x
+
+            # compute gradient wrt x0 and u(along horizon)
+            # cost_l, weight_grad_cost_l = self.cost(x, x_interpolated=x_interpolated, return_invidual_costs_and_weights=True)
+            # print(f'self.x0 -- {self.x0}')
+            # cost = 0
+            # # initial cost 
+            # cost += self.Q[0,0]*self.x0[0, 0]**2 + self.Q[1,1]*self.x0[0, 1]**2 + self.Q[2,2]*self.x0[0, 2]**2 + self.Q[3,3]*self.x0[0, 3]**2
+            # print(f'initial cost -- {cost}')
+            # x_current = self.x0
+            # # state cost
+            # for i in range(0, len(u[0])-1): # u.size(1)-1
+            #     # print(i)
+            #     x_next = self.cart_pole_dynamics(x_current, u[:,i,:]) 
+            #     # print(f'x_next -- {x_next}')
+            #     cost += self.Q[0,0]*x_next[0, 0]**2 + self.Q[1,1]*x_next[0, 1]**2 + self.Q[2,2]*x_next[0, 2]**2 + self.Q[3,3]*x_next[0, 3]**2 + self.R*u[:,i,:]**2
+            #     x_current = x_next
+            # print(f'state cost -- {cost}')
+
+            # # terminal cost 
+            # x_terminal = self.cart_pole_dynamics(x_current, u[:,-1,:])
+            # cost += self.P[0,0]*x_terminal[0, 0]**2 + self.P[1,1]*x_terminal[0, 1]**2 + self.P[2,2]*x_terminal[0, 2]**2 + self.P[3,3]*x_terminal[0, 3]**2 + self.R*u[:,-1,:]**2
+            # print(f'final cost -- {cost}')
+
+            # cost gradient w.r.t u
+            # grad_cost = torch.autograd.grad([cost], [u], retain_graph=True)[0]
+            
+            # 2*(10*self.x0[0, 0]+self.x0[0, 1]+10*self.x0[0, 2]+self.x0[0, 3]+torch.sum(u_norm))
+            grad_cost = 2*(torch.sum(u_norm))
+            print(f'grad_cost -- {grad_cost}')
+
+            # clip gradients
+            grad_cost_clipped = self.clip_gradient(grad_cost)
+            weight_grad_cost = 1e-7
+            grad_cost_clipped_weighted = weight_grad_cost * grad_cost_clipped
+            grad = grad_cost_clipped_weighted
+            
+            # for cost, weight_grad_cost in zip(cost_l, weight_grad_cost_l):
+            #     if torch.is_tensor(cost):
+            #         # y.sum() is a surrogate to compute gradients of independent quantities over the batch dimension
+            #         # x are the support points. Compute gradients wrt x, not x_interpolated
+            #         grad_cost = torch.autograd.grad([cost.sum()], [x], retain_graph=True)[0]
+
+            #         # clip gradients
+            #         grad_cost_clipped = self.clip_gradient(grad_cost)
+
+            #         # zeroing gradients at start and goal
+            #         grad_cost_clipped[..., 0, :] = 0.
+            #         grad_cost_clipped[..., -1, :] = 0.
+
+            #         # combine gradients
+            #         grad_cost_clipped_weighted = weight_grad_cost * grad_cost_clipped
+            #         grad += grad_cost_clipped_weighted
+
+        # gradient ascent
+        grad = -1. * grad
+        return grad
+
+    def clip_gradient(self, grad):
+        if self.clip_grad:
+            if self.clip_grad_rule == 'norm':
+                return self.clip_grad_by_norm(grad)
+            elif self.clip_grad_rule == 'value':
+                return self.clip_grad_by_value(grad)
+            else:
+                raise NotImplementedError
+        else:
+            return grad
+
+    def clip_grad_by_norm(self, grad):
+        # clip gradient by norm
+        if self.clip_grad:
+            grad_norm = torch.linalg.norm(grad + 1e-6, dim=-1, keepdims=True)
+            scale_ratio = torch.clip(grad_norm, 0., self.max_grad_norm) / grad_norm
+            grad = scale_ratio * grad
+        return grad
+
+    def clip_grad_by_value(self, grad):
+        # clip gradient by value
+        if self.clip_grad:
+            grad = torch.clip(grad, -self.max_grad_value, self.max_grad_value)
+        return grad
+    
+    def cart_pole_dynamics(self, x, u):
+        A = np.array([
+        [0, 1, 0, 0],
+        [0, -0.1, 3, 0],
+        [0, 0, 0, 1],
+        [0, -0.5, 30, 0]
+        ])
+
+        B = np.array([
+        [0],
+        [2],
+        [0],
+        [5]
+        ])
+
+        C = np.eye(4)
+
+        D = np.zeros((4,1))
+
+        # state space equation
+        sys_continuous = control.ss(A, B, C, D)
+
+        # sampling time
+        Ts = 0.1
+
+        # convert to discrete time dynamics
+        sys_discrete = control.c2d(sys_continuous, Ts, method='zoh')
+
+        A_d = sys_discrete.A
+        # print(f'A_d -- {A_d}')
+        B_d = sys_discrete.B
+        # print(f'B_d -- {B_d}')
+        C_d = sys_discrete.C
+        D_d = sys_discrete.D
+
+        # States
+        x_pos = x[0,0]
+        x_dot = x[0,1]
+        theta = x[0,2]
+        theta_dot = x[0,3]
+        # print(f'x_shape -- {x.shape}')
+        # print(f'u_shape -- {u.shape}')
+
+        x_next = np.concatenate((
+            A_d[0,0]*x_pos + A_d[0,1]*x_dot + A_d[0,2]*theta + A_d[0,3]*theta_dot + B_d[0,0]*u,
+            A_d[1,0]*x_pos + A_d[1,1]*x_dot + A_d[1,2]*theta + A_d[1,3]*theta_dot + B_d[1,0]*u,
+            A_d[2,0]*x_pos + A_d[2,1]*x_dot + A_d[2,2]*theta + A_d[2,3]*theta_dot + B_d[2,0]*u,
+            A_d[3,0]*x_pos + A_d[3,1]*x_dot + A_d[3,2]*theta + A_d[3,3]*theta_dot + B_d[3,0]*u), axis=0
+        )
+
+        x_next = np.transpose(x_next)
+        return x_next
 
 
 class GuideBase(nn.Module, abc.ABC):
