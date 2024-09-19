@@ -102,4 +102,77 @@ import os
 # task = torch.zeros(1, 1)
 # print(task.shape[0])
 
-print(torch.__version__)
+# print(torch.__version__)
+
+# rng_x = np.linspace(-1,1,50) # 50 x_0 samples
+# rng_theta = np.linspace(-np.pi/4,np.pi/4,50) # 50 theta_0 samples
+    
+# rng0 = []
+# for m in rng_x:
+#     for n in rng_theta:
+#         rng0.append([m,n])
+# rng0 = np.array(rng0,dtype=float)
+
+# # test = 101
+# test = 100
+
+# x_0 = rng0[test,0]
+# x_0= round(x_0, 3)
+# theta_0 = rng0[test,1]
+# theta_0= round(theta_0, 3)
+
+# #initial states 
+# x0 = np.array([x_0 , 0, theta_0, 0])  # Initial states
+# K = np.array([-3.16227764, -3.88839436, 23.42934742, 4.67212194])
+# u_start = -np.dot(K, x0)
+# print(u_start)
+
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# # Create a large tensor
+# x = torch.randn(10000, 10000, device=device)
+
+# # Perform a matrix multiplication
+# y = torch.matmul(x, x)
+
+# print("Operation completed on:", y.device)
+
+# u = torch.randn((1, 8, 1))
+# print(u)
+# for i in range(u.size(1)-1):
+#     print(i)
+# print(u[:,-1,:])
+
+# x_norm = torch.abs(x)
+# print(torch.abs(x))
+# print(torch.sum(x_norm))
+# rng_x = np.linspace(-1,1,50) # 50 x_0 samples
+# rng_theta = np.linspace(-np.pi/4,np.pi/4,50) # 50 theta_0 samples
+    
+# rng0 = []
+# for m in rng_x:
+#     for n in rng_theta:
+#         rng0.append([m,n])
+# rng0 = np.array(rng0,dtype=float)
+
+# # test = 101
+# test = 101
+
+# x_0 = rng0[test,0]
+# x_0= round(x_0, 3)
+# theta_0 = rng0[test,1]
+# theta_0= round(theta_0, 3)
+
+# x0 = np.array([[x_0 , 0, theta_0, 0]]) 
+# print(x0[0,3])
+
+# text_condition_hidden_dims = (512, 256)
+# print(text_condition_hidden_dims)
+
+
+context = torch.rand(6,4)
+print(context.size())
+mask_shape = torch.rand(context.size(0),1)
+# print(mask_shape)
+mask_size = torch.zeros_like(mask_shape)
+print(mask_size)
