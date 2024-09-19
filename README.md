@@ -51,6 +51,16 @@ cd ~/mpd-public
 bash setup.sh
 ```
 
+## Running the cart pole inference
+Based on a trained diffusion model, the cart pole inference is running via
+
+```bash
+conda activate mpd
+cd scripts/inference
+python cart_pole_inference.py 
+```
+
+
 ---
 ## Running the MPD inference
 
