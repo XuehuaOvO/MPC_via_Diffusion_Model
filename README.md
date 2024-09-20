@@ -41,11 +41,22 @@ cd ~/cart_pole_diffusion_based_on_MPD
 bash setup.sh
 ```
 
+Possible Errors:
+
 If Building wheel for hydra (setup.py) ... error, ...., error: command 'gcc' failed: No such file or directory
 ```bash
 conda install gcc
 ```
 
+If subprocess.CalledProcessError: Command '['which', 'c++']' returned non-zero exit status 1.
+```bash
+apt install g++
+```
+
+If AttributeError: module 'numpy' has no attribute 'float'
+```bash
+pip install numpy==1.23.5
+```
 
 
 ## Running the cart pole inference
