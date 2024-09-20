@@ -12,37 +12,26 @@ Carvalho, J.; Le, A.T.; Baierl, M.; Koert, D.; Peters, J. (2023). **_Motion Plan
 </p>
 
 ---
-This repository implements `MPD` - Motion Planning Diffusion -, a method for learning and planning robot motions with
-diffusion models, which was presented at IROS 2023.
 
-**NOTES**
-- Since the IROS submission we improve the code for better parallelization and improved the baselines.
-Hence, the results in the paper are slightly outated, but the qualitivative results are still valid.
-- We changed the data generation to use RRT Connect followed by GPMP2, which we found to lead to smoother results.
-- The training of the baseline (CVAE) and comparison with traditional planning methods will be added soon. 
-
-
-If you have any questions please let me know -- [joao@robot-learning.de](mailto:joao@robot-learning.de)
-
----
 ## Installation
 
 Pre-requisites:
-- Ubuntu 20.04 (maybe works with other OS)
+- Ubuntu 20.04
 - [miniconda](https://docs.conda.io/projects/miniconda/en/latest/index.html)
 
 Clone this repository with
 ```bash
 cd ~
-git clone --recurse-submodules https://github.com/jacarvalho/mpd-public.git
-cd mpd-public
+git clone https://github.com/XuehuaOvO/cart_pole_diffusion_based_on_MPD.git
+cd cart_pole_diffusion_based_on_MPD
 ```
 
-Download [IsaacGym Preview 4](https://developer.nvidia.com/isaac-gym) and extract it under `deps/isaacgym`
+Download [IsaacGym Preview 4](https://developer.nvidia.com/isaac-gym) via wget for remote container and extract it under `deps/isaacgym`
 ```bash
-mv ~/Downloads/IsaacGym_Preview_4_Package.tar.gz ~/mpd-public/deps/
-cd ~/mpd-public/deps
-tar -xvf IsaacGym_Preview_4_Package.tar.gz
+wget https://developer.nvidia.com/isaac-gym-preview-4 
+mv ~/isaac-gym-preview-4 /root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/deps/isaac-gym-preview-4
+cd ~/cart_pole_diffusion_based_on_MPD/deps
+tar -xvf isaac-gym-preview-4
 ```
 
 Run the bash setup script to install everything.
