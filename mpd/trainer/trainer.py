@@ -12,7 +12,6 @@ from tqdm.autonotebook import tqdm
 from torch_robotics.torch_utils.torch_timer import TimerCUDA
 from torch_robotics.torch_utils.torch_utils import dict_to_device, DEFAULT_TENSOR_ARGS, to_numpy
 
-# from classifier_free_guidance_pytorch import TextConditioner
 
 
 def get_num_epochs(num_train_steps, batch_size, dataset_len):
