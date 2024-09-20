@@ -13,7 +13,7 @@ Carvalho, J.; Le, A.T.; Baierl, M.; Koert, D.; Peters, J. (2023). **_Motion Plan
 
 ---
 
-## Installation
+## Installation for cart pole diffusion
 
 Pre-requisites:
 - Ubuntu 20.04
@@ -23,6 +23,7 @@ Clone this repository with
 ```bash
 cd ~
 git clone https://github.com/XuehuaOvO/cart_pole_diffusion_based_on_MPD.git
+git submodule update --init --recursive # Initialize and update the submodules
 cd cart_pole_diffusion_based_on_MPD
 ```
 
@@ -36,9 +37,16 @@ tar -xvf isaac-gym-preview-4
 
 Run the bash setup script to install everything.
 ```
-cd ~/mpd-public
+cd ~/cart_pole_diffusion_based_on_MPD
 bash setup.sh
 ```
+
+If Building wheel for hydra (setup.py) ... error, ...., error: command 'gcc' failed: No such file or directory
+```bash
+conda install gcc
+```
+
+
 
 ## Running the cart pole inference
 Based on a trained diffusion model, the cart pole inference is running via
