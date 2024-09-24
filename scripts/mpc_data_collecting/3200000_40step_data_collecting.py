@@ -5,7 +5,7 @@ import torch
 import os
 import matplotlib.pyplot as plt
 
-############### Seetings ######################
+############### Seetings #######################
 
 # data saving folder
 folder_path = "/root/cartpoleDiff/cartpole_lmpc_data"
