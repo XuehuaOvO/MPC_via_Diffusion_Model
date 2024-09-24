@@ -58,6 +58,7 @@ If AttributeError: module 'numpy' has no attribute 'float'
 pip install numpy==1.23.5
 ```
 
+## linear mpc data collecting
 
 ## Running the cart pole inference
 Based on a trained diffusion model, the cart pole inference is running via
