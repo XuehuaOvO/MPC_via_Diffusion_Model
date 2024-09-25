@@ -23,12 +23,13 @@ allow_ops_in_compiled_graph()
 
 
 TRAINED_MODELS_DIR = '../../data_trained_models/'
+MODEL_FOLDER = '2406400_training_data'
 
 MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/data_trained_models/2406400_training_data/200000'
 MODEL_ID = 200000
 WEIGHT_GUIDANC = 0.01
-X0_IDX = 64 # range:[0,99]
-ITERATIONS = 32
+X0_IDX = 95 # range:[0,99]
+ITERATIONS = 50
 HORIZON = 8
 U_SAVED_PATH = '/root/cartpoleDiff/cartpole_inference_u_results'
 
@@ -85,44 +86,25 @@ def cart_pole_dynamics(x, u):
 def experiment(
     #########################################################################################
     # Model id
-    model_id: str = '2406400_training_data', # CartPole-LMPC   -49600
+    model_id: str = MODEL_FOLDER, 
 
-    # planner_alg: str = 'diffusion_prior',
-    # planner_alg: str = 'diffusion_prior_then_guide',
     planner_alg: str = 'mpd',
-
-    # use_guide_on_extra_objects_only: bool = False,
 
     n_samples: int = 1,
 
-    # start_guide_steps_fraction: float = 0.25,
-    # n_guide_steps: int = 1,
     n_diffusion_steps_without_noise: int = 5,
-
-    # weight_grad_cost_collision: float = 1e-2, # 
-    # weight_grad_cost_smoothness: float = 1e-7,
-
-    # factor_num_interpolated_points_for_collision: float = 1.5, 
-
-    # trajectory_duration: float = 5.0,  # currently fixed
 
     ##############################################################
     device: str = 'cuda',
-
-    # debug: bool = True,
-
-    # render: bool = True,
 
     ##############################################################
     # MANDATORY
     seed: int = 30,
     results_dir: str = 'logs',
-    # x0 = None,
     ##############################################################
     # **kwargs
 ):
     ##############################################################
-    # fix_random_seed(seed)
 
     device = get_torch_device(device)
     tensor_args = {'device': device, 'dtype': torch.float32}
@@ -143,8 +125,7 @@ def experiment(
         raise NotImplementedError
 
     ################################################################
-    # model_dir = os.path.join(TRAINED_MODELS_DIR, model_id)
-    model_dir = MODEL_PATH # /home/xiao/mpd-public/data_trained_models/CartPole-LMPC
+    model_dir = MODEL_PATH 
     results_dir = os.path.join(model_dir, 'results_inference')
     
     os.makedirs(results_dir, exist_ok=True)
@@ -159,7 +140,6 @@ def experiment(
         tensor_args=tensor_args
     )
     dataset = train_subset.dataset
-    # print(f'train -- {train_subset}')
     print(f'dataset -- {len(dataset)}')
 
     n_support_points = dataset.n_support_points
@@ -387,23 +367,24 @@ def experiment(
 
     ########################## Diffusion & MPC Control Inputs Results Saving ################################
 
-    results_folder = U_SAVED_PATH
+    results_folder = os.path.join(U_SAVED_PATH, 'model_'+ str(MODEL_ID), 'x0_'+ str(X0_IDX))
+    os.makedirs(results_folder, exist_ok=True)
     
     # save the first u 
-    diffusion_u = str(MODEL_ID) + '_' + 'u_diffusion.npy'
+    diffusion_u = 'u_diffusion.npy'
     diffusion_u_path = os.path.join(results_folder, diffusion_u)
     np.save(diffusion_u_path, u_track)
 
-    mpc_u = str(MODEL_ID) + '_' + 'u_mpc.npy'
+    mpc_u = 'u_mpc.npy'
     mpc_u_path = os.path.join(results_folder, mpc_u)
     np.save(mpc_u_path, u_mpc_track)
 
     # save the u along horizon
-    diffusion_u_horizon = str(MODEL_ID) + '_' + 'u_horizon_diffusion.npy'
+    diffusion_u_horizon = 'u_horizon_diffusion.npy'
     diffusion_u_horizon_path = os.path.join(results_folder, diffusion_u_horizon)
     np.save(diffusion_u_horizon_path, u_horizon_track)
 
-    mpc_u_horizon = str(MODEL_ID) + '_' + 'u_horizon_mpc.npy'
+    mpc_u_horizon = 'u_horizon_mpc.npy'
     mpc_u_horizon_path = os.path.join(results_folder, mpc_u_horizon)
     np.save(mpc_u_horizon_path, u_mpc_horizon_track)
 
