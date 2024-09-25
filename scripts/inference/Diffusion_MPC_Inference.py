@@ -30,6 +30,7 @@ WEIGHT_GUIDANC = 0.01
 X0_IDX = 64 # range:[0,99]
 ITERATIONS = 32
 HORIZON = 8
+U_SAVED_PATH = '/root/cartpoleDiff/cartpole_inference_u_results'
 
 # cart pole dynamics
 def cart_pole_dynamics(x, u):
@@ -386,7 +387,7 @@ def experiment(
 
     ########################## Diffusion & MPC Control Inputs Results Saving ################################
 
-    results_folder = '/root/cartpoleDiff/cartpole_inference_u_results'
+    results_folder = U_SAVED_PATH
     
     # save the first u 
     diffusion_u = str(MODEL_ID) + '_' + 'u_diffusion.npy'
