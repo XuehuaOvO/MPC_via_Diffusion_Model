@@ -70,6 +70,7 @@ def experiment(
     fix_random_seed(seed)
 
     device = get_torch_device(device=device)
+    print(f'device --{device}')
     tensor_args = {'device': device, 'dtype': torch.float32}
 
     # Dataset

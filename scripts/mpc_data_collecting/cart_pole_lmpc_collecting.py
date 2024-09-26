@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 ############### Seetings ######################
 
 # data saving folder
-folder_path = "C:/Users/Xuehua Xiao/Desktop/S1_CartPole/mpc data collecting"
+folder_path = "/root/cartpoleDiff/cartpole_lmpc_data"
 
 # simulation time
 # T = 6.5  # Total time (seconds) 6.5

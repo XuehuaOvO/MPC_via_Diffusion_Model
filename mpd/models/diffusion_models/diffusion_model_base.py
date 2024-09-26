@@ -187,7 +187,7 @@ class GaussianDiffusionModel(nn.Module, ABC):
 
         batch_size = shape[0]
         x = torch.randn(shape, device=device) # initial state(noise) with shape 1*8*1
-        print(f'random x -- {x}')
+        # print(f'random x -- {x}')
         # x = apply_hard_conditioning(x, hard_conds)
 
         chain = [x] if return_chain else None
@@ -361,9 +361,9 @@ class GaussianDiffusionModel(nn.Module, ABC):
     def run_inference(self, context=None, hard_conds=None, n_samples=1, return_chain=False, **diffusion_kwargs):
         # context and hard_conds must be normalized
         hard_conds = copy(hard_conds)
-        print(f'hard_conds -- {hard_conds}')
+        # print(f'hard_conds -- {hard_conds}')
         context = copy(context)
-        print(f'context -- {context}')
+        # print(f'context -- {context}')
         # repeat hard conditions and contexts for n_samples
         for k, v in hard_conds.items():
             new_state = einops.repeat(v, 'd -> b d', b=n_samples)

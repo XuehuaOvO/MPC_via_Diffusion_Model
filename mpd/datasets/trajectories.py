@@ -14,8 +14,8 @@ from torch_robotics.environments.env_simple_2d_extra_objects import EnvSimple2DE
 from torch_robotics.tasks.tasks import PlanningTask
 from torch_robotics.visualizers.planning_visualizer import PlanningVisualizer
 
-repo = git.Repo('.', search_parent_directories=True)
-dataset_base_dir = os.path.join(repo.working_dir, 'data_trajectories')
+# repo = git.Repo('.', search_parent_directories=True)
+dataset_base_dir = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/data_trajectories' # os.path.join(repo.working_dir, 'data_trajectories')
 
 
 class TrajectoryDatasetBase(Dataset, abc.ABC):
