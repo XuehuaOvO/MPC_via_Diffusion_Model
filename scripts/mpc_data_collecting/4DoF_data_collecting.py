@@ -8,15 +8,28 @@ import matplotlib.pyplot as plt
 ############### Seetings #######################
 
 # data saving folder
-folder_path = "/root/cartpoleDiff/cartpole_lmpc_data"
+folder_path = "/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data_collecting"
+
+# control steps
+CONTROL_STEPS = 30
+
+# data range
+POSITION_INITIAL_RANGE = np.linspace(-1,1,20) 
+VELOCITY_INITIAL_TANGE = np.linspace(-1,1,10) 
+THETA_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4,20) 
+THETA_DOT_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4,10)
+
+N = 8 # mpc prediction horizon
+
+# trainind data files name
+U_DATA_NAME = '4DoF_u_all_1200000-8-1.pt' # 1200000 = 20*10*20*10*30: training data amount, 8: horizon length, 1:channels --> 400000-8-1: tensor size for data trainig 
+X0_CONDITION_DATA_NAME = '4DoF_x_all_1200000-4.pt' # 1200000-4: tensor size for conditioning data in training
 
 # simulation time
-T = 3.1  # Total time (seconds) 6.5
-dt = 0.1  # Time step (seconds)
-t = np.arange(0, T, dt) # time intervals 31
-print(t.shape)
-
-N = 8 # prediction horizon
+# T = 3.1  # Total time (seconds) 6.5
+# dt = 0.1  # Time step (seconds)
+# t = np.arange(0, T, dt) # time intervals 31
+# print(t.shape)
 
 ############### Dynamics Define ######################
 def cart_pole_dynamics(x, u):
@@ -78,10 +91,10 @@ P = np.diag([100, 1, 100, 1])
 # x_ref = ca.SX.sym('x_ref', 4)
 
 # Define the initial states range
-rng_x = np.linspace(-3,3,20) 
-rng_x_dot = np.linspace(-3,3,20)   
-rng_theta = np.linspace(-1,1,10)
-rng_theta_dot = np.linspace(-np.pi,np.pi,20) 
+rng_x = POSITION_INITIAL_RANGE 
+rng_x_dot = VELOCITY_INITIAL_TANGE   
+rng_theta = THETA_INITIAL_RANGE
+rng_theta_dot = THETA_DOT_INITIAL_RANGE
 rng0 = []
 for m in rng_x:
     for n in rng_x_dot:
@@ -95,11 +108,11 @@ print(f'rng0 -- {rng0.shape}')
 # ##### data collecting loop #####
 
 # data set for each turn
-x_track = np.zeros((4, len(t)))
-x_predicted_track = np.zeros((num_datagroup*(len(t)-1), N+1, 4))
-u_track = np.zeros((1, len(t)-1))
+x_track = np.zeros((4, (CONTROL_STEPS+1)))
+x_predicted_track = np.zeros((num_datagroup*(CONTROL_STEPS), N+1, 4))
+u_track = np.zeros((1, CONTROL_STEPS))
 
-grp_size = len(t)-1
+grp_size = CONTROL_STEPS
 
 # data (x,u) collecting (saved in PT file)
 x_all_tensor = torch.zeros(num_datagroup*grp_size,4) # x0: 2400,000*4
@@ -126,7 +139,7 @@ for turn in range(0,num_datagroup):
   print(f'x0-- {x0}')
   x_track[:,0] = x0
 
-  for i in range(0, len(t)-1):
+  for i in range(0, CONTROL_STEPS):
        # casadi_Opti
        optimizer = ca.Opti()
   
@@ -236,10 +249,10 @@ print(f'first_x0 -- {x_all_tensor[0,:]}')
 print(f'first_pre_x -- {x_predicted_tensor[0,:,:]}')
 
 # save u data in PT file for training
-torch.save(u_all_tensor, os.path.join(folder_path, f'u-tensor_2400000-8-1.pt'))
+torch.save(u_all_tensor, os.path.join(folder_path, U_DATA_NAME))
 
 # save x0 data in PT file as conditional info in training
-torch.save(x_all_tensor, os.path.join(folder_path, f'x0-tensor_2400000-4.pt'))
+torch.save(x_all_tensor, os.path.join(folder_path, X0_CONDITION_DATA_NAME))
 
 # save x_predicted data in PT file for possible cost calculation
-torch.save(x_predicted_tensor, os.path.join(folder_path, f'x_predicted_tensor_2400000-9-4.pt'))
+# torch.save(x_predicted_tensor, os.path.join(folder_path, f'x_predicted_tensor_2400000-9-4.pt'))

@@ -102,7 +102,7 @@ print(f'rng0 -- {rng0.shape}')
 # ##### data collecting loop #####
 
 # data set for each turn
-x_track = np.zeros((4, CONTROL_STEPS+1))
+x_track = np.zeros((4, (CONTROL_STEPS+1)))
 x_predicted_track = np.zeros((num_datagroup*CONTROL_STEPS, N+1, 4))
 u_track = np.zeros((1, CONTROL_STEPS))
 
