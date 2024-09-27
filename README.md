@@ -54,13 +54,19 @@ pip install numpy==1.23.5
 ```
 
 ## linear mpc data collecting (/scripts/mpc_data_collecting)
-Collecting noisy data (only the initial range of position and theta can be set, initial x_dot and theta_dot are always 0. Some parameters and paths should be set manually): 
+1. Collecting noisy data (only the initial range of position and theta can be set, initial x_dot and theta_dot are always 0. Some parameters and paths should be set manually): 
 ```bash
 conda activate mpd
 cd scripts/mpc_data_collecting
-python noisy_data_collecting.py 
+python noisy_data_collecting.py
 ```
 
+2. Collecting data with 4 DoF initial range (Some parameters and paths should be set manually):
+```bash
+conda activate mpd
+cd scripts/mpc_data_collecting
+python 4DoF_data_collecting.py 
+```
 
 
 ## Running the cart pole inference
