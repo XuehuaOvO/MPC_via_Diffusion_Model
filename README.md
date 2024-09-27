@@ -6,11 +6,6 @@ Carvalho, J.; Le, A.T.; Baierl, M.; Koert, D.; Peters, J. (2023). **_Motion Plan
 [<img src="https://img.shields.io/badge/arxiv-%23B31B1B.svg?&style=for-the-badge&logo=arxiv&logoColor=white" />](https://arxiv.org/abs/2308.01557)
 
 
-<p float="middle">
-  <img src="figures/EnvDense2D-RobotPointMass.gif" width="45%" />
-  <img src="figures/EnvSpheres3D-RobotPanda.gif" width="45%" />
-</p>
-
 ---
 
 ## Installation for cart pole diffusion
@@ -58,7 +53,15 @@ If AttributeError: module 'numpy' has no attribute 'float'
 pip install numpy==1.23.5
 ```
 
-## linear mpc data collecting
+## linear mpc data collecting (/scripts/mpc_data_collecting)
+Collecting noisy data (only the initial range of position and theta can be set, initial x_dot and theta_dot are always 0. Some parameters and paths should be set manually): 
+```bash
+conda activate mpd
+cd scripts/mpc_data_collecting
+python noisy_data_collecting.py 
+```
+
+
 
 ## Running the cart pole inference
 Based on a trained diffusion model, the cart pole inference is running via
