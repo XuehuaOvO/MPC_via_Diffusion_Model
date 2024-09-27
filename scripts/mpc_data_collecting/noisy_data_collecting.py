@@ -6,17 +6,26 @@ import os
 import matplotlib.pyplot as plt
 
 ############### Seetings ######################
+# Attention: this py file can only set the initial range of position and theta, initial x_dot and theta_dot are always 0
 
 # data saving folder
-folder_path = "/root/cartpoleDiff/cartpole_lmpc_data"
+folder_path = "/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data_collecting"
 
-# simulation time
-T = 5.1  # Total time (seconds) 5.1
-dt = 0.1  # Time step (seconds)
-t = np.arange(0, T, dt) # time intervals 51
-print(t.shape)
+# control steps
+CONTROL_STEPS = 50
 
-N = 8 # prediction horizon
+# data range
+POSITION_INITIAL_RANGE = np.linspace(-1,1,20) 
+THETA_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4,20) 
+
+# number of noisy data for each state
+NUM_NOISY_DATA = 20
+
+N = 8 # mpc prediction horizon
+
+# trainind data files name
+U_DATA_NAME = 'noisy_u_all_400000-8-1.pt' # 400000: training data amount, 8: horizon length, 1:channels --> 400000-8-1: tensor size for data trainig 
+X0_CONDITION_DATA_NAME = 'noisy_x_all_400000-4.pt' # 400000-4: tensor size for conditioning data in training
 
 np.random.seed(42)
 
@@ -80,8 +89,8 @@ P = np.diag([100, 1, 100, 1])
 # x_ref = ca.SX.sym('x_ref', 4)
 
 # Define the initial states range
-rng_x = np.linspace(-1,1,20) 
-rng_theta = np.linspace(-np.pi/4,np.pi/4,20) 
+rng_x = POSITION_INITIAL_RANGE 
+rng_theta = THETA_INITIAL_RANGE 
 rng0 = []
 for m in rng_x:
     for n in rng_theta:
@@ -93,20 +102,20 @@ print(f'rng0 -- {rng0.shape}')
 # ##### data collecting loop #####
 
 # data set for each turn
-x_track = np.zeros((4, len(t)))
-x_predicted_track = np.zeros((num_datagroup*(len(t)-1), N+1, 4))
-u_track = np.zeros((1, len(t)-1))
+x_track = np.zeros((4, CONTROL_STEPS+1))
+x_predicted_track = np.zeros((num_datagroup*CONTROL_STEPS, N+1, 4))
+u_track = np.zeros((1, CONTROL_STEPS))
 
 # data (x,u) collecting (saved in PT file)
-x_all_tensor = torch.zeros(num_datagroup*(len(t)-1),4) # x0: 20000*4
-x_predicted_tensor = torch.zeros(num_datagroup*(len(t)-1),N+1,4) # 20000*9*4
-u_all_tensor = torch.zeros(num_datagroup*(len(t)-1),N,1) # u: 20000*8*1
+x_all_tensor = torch.zeros(num_datagroup*(CONTROL_STEPS),4) # x0: 20000*4
+x_predicted_tensor = torch.zeros(num_datagroup*(CONTROL_STEPS),N+1,4) # 20000*9*4
+u_all_tensor = torch.zeros(num_datagroup*(CONTROL_STEPS),N,1) # u: 20000*8*1
 
 # all noisy data
-num_noisy_state = 20
+num_noisy_state = NUM_NOISY_DATA
 
-noisy_x_all = torch.zeros(num_datagroup*(len(t)-1)*num_noisy_state, 4) # 400000*4
-noisy_u_all = torch.zeros(num_datagroup*(len(t)-1)*num_noisy_state, N, 1) # 400000*8*1
+noisy_x_all = torch.zeros(num_datagroup*(CONTROL_STEPS)*num_noisy_state, 4) # 400000*4
+noisy_u_all = torch.zeros(num_datagroup*(CONTROL_STEPS)*num_noisy_state, N, 1) # 400000*8*1
 
 for turn in range(0,num_datagroup):
 
@@ -140,12 +149,12 @@ for turn in range(0,num_datagroup):
         noisey_x_array [n,:] = noisy_state 
 
   # save the initail noisy x group
-  noisy_x_all[turn*(len(t)-1)*num_noisy_state:turn*(len(t)-1)*num_noisy_state+num_noisy_state,:] = torch.tensor(noisey_x_array)
-  print(f'start,end -- {turn*(len(t)-1)*num_noisy_state, turn*(len(t)-1)*num_noisy_state+num_noisy_state}')
-  print(f'noisy_x0 -- {noisy_x_all[turn*(len(t)-1)*num_noisy_state:turn*(len(t)-1)*num_noisy_state+num_noisy_state,:]}')
+  noisy_x_all[turn*(CONTROL_STEPS)*num_noisy_state:turn*(CONTROL_STEPS)*num_noisy_state+num_noisy_state,:] = torch.tensor(noisey_x_array)
+  print(f'start,end -- {turn*(CONTROL_STEPS)*num_noisy_state, turn*(CONTROL_STEPS)*num_noisy_state+num_noisy_state}')
+  print(f'noisy_x0 -- {noisy_x_all[turn*(CONTROL_STEPS)*num_noisy_state:turn*(CONTROL_STEPS)*num_noisy_state+num_noisy_state,:]}')
 
   # main mpc loop
-  for i in range(0, len(t)-1):
+  for i in range(0, CONTROL_STEPS):
        # casadi_Opti
        # optimizer = ca.Opti()
 
@@ -191,8 +200,8 @@ for turn in range(0,num_datagroup):
                u_for_noisy_x[m,v] = U_noisy_sol[v]
 
        # save noisy u 
-       noisy_u_all[turn*(len(t)-1)*num_noisy_state + i*num_noisy_state : turn*(len(t)-1)*num_noisy_state + i*num_noisy_state + num_noisy_state,:,0] = torch.tensor(u_for_noisy_x)
-       print(f'u_start, u_end -- {turn*(len(t)-1)*num_noisy_state + i*num_noisy_state, turn*(len(t)-1)*num_noisy_state + i*num_noisy_state + num_noisy_state}')
+       noisy_u_all[turn*(CONTROL_STEPS)*num_noisy_state + i*num_noisy_state : turn*(CONTROL_STEPS)*num_noisy_state + i*num_noisy_state + num_noisy_state,:,0] = torch.tensor(u_for_noisy_x)
+       print(f'u_start, u_end -- {turn*(CONTROL_STEPS)*num_noisy_state + i*num_noisy_state, turn*(CONTROL_STEPS)*num_noisy_state + i*num_noisy_state + num_noisy_state}')
 
        ################################################# normal mpc loop to update state #################################################
        
@@ -229,7 +238,7 @@ for turn in range(0,num_datagroup):
 
        X_sol = sol.value(X_pre)
        # print(f'X_sol_shape -- {X_sol.shape}')
-       x_predicted_track[turn*(len(t)-1)+i,:,:] = X_sol.T
+       x_predicted_track[turn*(CONTROL_STEPS)+i,:,:] = X_sol.T
        U_sol = sol.value(U_pre)
        print(f'U_sol - {U_sol}') 
 
@@ -249,7 +258,7 @@ for turn in range(0,num_datagroup):
        u_tensor = torch.tensor(u_reshape)
        # print(f'u_tensor_shape -- {u_tensor}')
        print(f'turn, i -- {turn, i}')
-       u_all_tensor[turn*(len(t)-1)+i,:,0] = u_tensor
+       u_all_tensor[turn*(CONTROL_STEPS)+i,:,0] = u_tensor
 
        ################################## noisy data generating ##################################
        noisey_x_array = np.zeros((num_noisy_state, x0.shape[0]))
@@ -262,18 +271,18 @@ for turn in range(0,num_datagroup):
        # print(f'noisey_x_array -- {noisey_x_array}')
          
        # save the initail noisy x group (except the last x0)
-       if i != len(t) - 2:
-            noisy_x_all[turn*(len(t)-1)*num_noisy_state + (i+1)*num_noisy_state : turn*(len(t)-1)*num_noisy_state + (i+1)*num_noisy_state + num_noisy_state,:] = torch.tensor(noisey_x_array)
-       print(f'start,end -- {turn*(len(t)-1)*num_noisy_state + (i+1)*num_noisy_state, turn*(len(t)-1)*num_noisy_state + (i+1)*num_noisy_state + num_noisy_state}')
-       print(f'noisy x last -- {noisy_x_all[turn*(len(t)-1)*num_noisy_state + (i)*num_noisy_state : turn*(len(t)-1)*num_noisy_state + (i)*num_noisy_state + num_noisy_state,:]}')
-       print(f'noisy u last -- {noisy_u_all[turn*(len(t)-1)*num_noisy_state + i*num_noisy_state : turn*(len(t)-1)*num_noisy_state + i*num_noisy_state + num_noisy_state,:,0]}')
+       if i != CONTROL_STEPS - 1:
+            noisy_x_all[turn*(CONTROL_STEPS)*num_noisy_state + (i+1)*num_noisy_state : turn*(CONTROL_STEPS)*num_noisy_state + (i+1)*num_noisy_state + num_noisy_state,:] = torch.tensor(noisey_x_array)
+       print(f'start,end -- {turn*(CONTROL_STEPS)*num_noisy_state + (i+1)*num_noisy_state, turn*(CONTROL_STEPS)*num_noisy_state + (i+1)*num_noisy_state + num_noisy_state}')
+       print(f'noisy x last -- {noisy_x_all[turn*(CONTROL_STEPS)*num_noisy_state + (i)*num_noisy_state : turn*(CONTROL_STEPS)*num_noisy_state + (i)*num_noisy_state + num_noisy_state,:]}')
+       print(f'noisy u last -- {noisy_u_all[turn*(CONTROL_STEPS)*num_noisy_state + i*num_noisy_state : turn*(CONTROL_STEPS)*num_noisy_state + i*num_noisy_state + num_noisy_state,:,0]}')
 
 
   # save states in tensor
   x_save = x_track[:,:-1]
   x_reshape = np.transpose(x_save)
   x_tensor = torch.tensor(x_reshape)
-  x_all_tensor[turn*(len(t)-1):turn*(len(t)-1)+(len(t)-1),:] = x_tensor 
+  x_all_tensor[turn*(CONTROL_STEPS):turn*(CONTROL_STEPS)+(CONTROL_STEPS),:] = x_tensor 
 
 
   # plot some results
@@ -324,16 +333,30 @@ print(f'first_x0 -- {x_all_tensor[0,:]}')
 print(f'first_pre_x -- {x_predicted_tensor[0,:,:]}')
 
 # save u data in PT file for training
-torch.save(u_all_tensor, os.path.join(folder_path, f'u-tensor_20000-8-1.pt'))
+# torch.save(u_all_tensor, os.path.join(folder_path, f'u-tensor_20000-8-1.pt'))
 
-# save x0 data in PT file as conditional info in training
-torch.save(x_all_tensor, os.path.join(folder_path, f'x0-tensor_20000-4.pt'))
+# # save x0 data in PT file as conditional info in training
+# torch.save(x_all_tensor, os.path.join(folder_path, f'x0-tensor_20000-4.pt'))
 
-# save x_predicted data in PT file for possible cost calculation
-torch.save(x_predicted_tensor, os.path.join(folder_path, f'x_predicted_tensor_20000-9-4.pt'))
+# # save x_predicted data in PT file for possible cost calculation
+# torch.save(x_predicted_tensor, os.path.join(folder_path, f'x_predicted_tensor_20000-9-4.pt'))
 
-# save noisy_x_all in PT file
-torch.save(noisy_x_all, os.path.join(folder_path, f'noisy_x_all_400000-4.pt'))
+# # save noisy_x_all in PT file
+# torch.save(noisy_x_all, os.path.join(folder_path, f'noisy_x_all_400000-4.pt'))
 
-# save u data in PT file for training
-torch.save(noisy_u_all, os.path.join(folder_path, f'noisy_u_all_400000-8-1.pt'))
+# # save u data in PT file for training
+# torch.save(noisy_u_all, os.path.join(folder_path, f'noisy_u_all_400000-8-1.pt'))
+
+##### data combing #####
+
+# u combine 
+u_training_data = torch.cat((noisy_u_all, u_all_tensor), dim=0)
+print(f'u_training_data -- {u_training_data.size()}')
+
+# x0 combine
+x0_conditioning_data = torch.cat((noisy_x_all, x_all_tensor), dim=0)
+print(f'x0_conditioning_data -- {x0_conditioning_data.size()}')
+
+# data saving
+torch.save(u_training_data, os.path.join(folder_path, U_DATA_NAME))
+torch.save(x0_conditioning_data, os.path.join(folder_path, X0_CONDITION_DATA_NAME))
