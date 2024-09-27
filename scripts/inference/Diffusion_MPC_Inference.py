@@ -5,7 +5,6 @@ import control
 import numpy as np
 import os
 
-#import einops
 import matplotlib.pyplot as plt
 import torch
 from einops._torch_specific import allow_ops_in_compiled_graph  # requires einops>=0.6.1
@@ -22,16 +21,16 @@ from torch_robotics.torch_utils.torch_utils import get_torch_device, freeze_torc
 allow_ops_in_compiled_graph()
 
 
-TRAINED_MODELS_DIR = '../../data_trained_models/'
-MODEL_FOLDER = '2406400_training_data'
+TRAINED_MODELS_DIR = '../../trained_models/' 
+MODEL_FOLDER = '420000_models_with_noisy_data' # choose a main model folder saved in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
 
-MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/data_trained_models/2406400_training_data/200000'
-MODEL_ID = 200000
-WEIGHT_GUIDANC = 0.01
-X0_IDX = 95 # range:[0,99]
-ITERATIONS = 50
-HORIZON = 8
-U_SAVED_PATH = '/root/cartpoleDiff/cartpole_inference_u_results'
+MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/420000_models_with_noisy_data/230000' # the absolute path of the trained model
+MODEL_ID = 230000 # number of training
+WEIGHT_GUIDANC = 0.01 # non-conditioning weight
+X0_IDX = 150 # range:[0,199] 20*20 data 
+ITERATIONS = 50 # control loop (steps)
+HORIZON = 8 # mpc horizon
+U_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving'
 
 # cart pole dynamics
 def cart_pole_dynamics(x, u):
@@ -148,8 +147,8 @@ def experiment(
 
     #################################################################
     # load initial starting state x0
-    rng_x = np.linspace(-1,1,10) # 10 x_0 samples
-    rng_theta = np.linspace(-np.pi/4,np.pi/4,10) # 10 theta_0 samples
+    rng_x = np.linspace(-1,1,20) # 20 x_0 samples
+    rng_theta = np.linspace(-np.pi/4,np.pi/4,20) # 20 theta_0 samples
     
     # all possible initial states combinations
     rng0 = []
@@ -162,9 +161,9 @@ def experiment(
     test = X0_IDX
 
     x_0 = rng0[test,0]
-    x_0= round(x_0, 3)
+    x_0= round(x_0, 4)
     theta_0 = rng0[test,1]
-    theta_0= round(theta_0, 3)
+    theta_0= round(theta_0, 4)
 
 
     #initial context
@@ -284,8 +283,8 @@ def experiment(
     P = np.diag([100, 1, 100, 1])
 
     # Define the initial states range
-    rng_x = np.linspace(-1,1,10) 
-    rng_theta = np.linspace(-np.pi/4,np.pi/4,10) 
+    rng_x = np.linspace(-1,1,20) 
+    rng_theta = np.linspace(-np.pi/4,np.pi/4,20) 
     rng0 = []
     for m in rng_x:
         for n in rng_theta:
@@ -301,9 +300,9 @@ def experiment(
     u_mpc_horizon_track = np.zeros((num_loop, HORIZON))
 
     x_0 = rng0[test,0]
-    x_0= round(x_0, 3)
+    x_0= round(x_0, 4)
     theta_0 = rng0[test,1]
-    theta_0= round(theta_0, 3)
+    theta_0= round(theta_0, 4)
 
     #save the initial states
     x0 = np.array([x_0, 0, theta_0, 0])  # Initial states
