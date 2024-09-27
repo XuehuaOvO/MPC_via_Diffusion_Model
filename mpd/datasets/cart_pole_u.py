@@ -11,7 +11,11 @@ from mpd.utils.loading import load_params_from_yaml
 
 # repo = git.Repo('.', search_parent_directories=True)
 # print(f'repo -- {repo}')
-dataset_base_dir = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/data_trajectories'  # os.path.join(repo.working_dir, 'data_trajectories')
+dataset_base_dir = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data' 
+
+# Data Name Setting 
+U_DATA_NAME = 'u_tensor_420000-8-1.pt'
+X0_CONDITION_DATA_NAME = 'x0_tensor_420000-4.pt'
 
 class InputsDataset(Dataset, abc.ABC):
 
@@ -65,7 +69,7 @@ class InputsDataset(Dataset, abc.ABC):
         # load training inputs
         check = self.tensor_args['device']
         print(f'tensor_device -- {check}')
-        inputs_load = torch.load(os.path.join(self.base_dir, 'u_tensor_2406400-8-1.pt'),map_location=self.tensor_args['device']) 
+        inputs_load = torch.load(os.path.join(self.base_dir, U_DATA_NAME),map_location=self.tensor_args['device']) 
         inputs_load = inputs_load.float()
         inputs_training = inputs_load
         # self.inputs_dim = inputs_training.shape
@@ -101,7 +105,7 @@ class InputsDataset(Dataset, abc.ABC):
         self.fields[self.field_key_inputs] = inputs_training
 
         # x0 condition
-        x0_condition =  torch.load(os.path.join(self.base_dir, 'x0_tensor_2406400-4.pt'),map_location=self.tensor_args['device'])
+        x0_condition =  torch.load(os.path.join(self.base_dir, X0_CONDITION_DATA_NAME),map_location=self.tensor_args['device'])
         x0_condition = x0_condition.float()
         print(f'condition_list_length -- {len(x0_condition)}')
         self.fields[self.field_key_condition] = x0_condition
