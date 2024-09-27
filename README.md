@@ -53,14 +53,28 @@ If AttributeError: module 'numpy' has no attribute 'float'
 pip install numpy==1.23.5
 ```
 
-## linear mpc data collecting (/scripts/mpc_data_collecting)
-Collecting noisy data (only the initial range of position and theta can be set, initial x_dot and theta_dot are always 0. Some parameters and paths should be set manually): 
+## linear mpc data collecting
+1. Collecting noisy data (only the initial range of position and theta can be set, initial x_dot and theta_dot are always 0. Some parameters and paths in noisy_data_collecting.py should be set manually): 
 ```bash
 conda activate mpd
 cd scripts/mpc_data_collecting
-python noisy_data_collecting.py 
+python noisy_data_collecting.py
 ```
 
+2. Collecting data with 4 DoF initial range (Some parameters and paths in 4DoF_data_collecting.py should be set manually):
+```bash
+conda activate mpd
+cd scripts/mpc_data_collecting
+python 4DoF_data_collecting.py
+```
+
+## model training
+Training Data Name Setting:
+In cart_pole_u.py, 
+```python
+U_DATA_NAME = 'u_tensor_420000-8-1.pt'
+X0_CONDITION_DATA_NAME = 'x0_tensor_420000-4.pt'
+```
 
 
 ## Running the cart pole inference
@@ -69,7 +83,7 @@ Based on a trained diffusion model, the cart pole inference is running via
 ```bash
 conda activate mpd
 cd scripts/inference
-python cart_pole_inference.py 
+python Diffusion_MPC_Inference.py  
 ```
 
 
