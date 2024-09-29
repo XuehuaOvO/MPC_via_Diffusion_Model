@@ -10,7 +10,7 @@ os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
 ####### Setting ######
 
-# traing data folder
+# training data folder
 DATASET_SUBDIR = 'CartPole-LMPC' # the folder of the training data files (location: /root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC)
 
 # training data amount
