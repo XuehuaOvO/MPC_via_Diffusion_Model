@@ -18,8 +18,8 @@ Clone this repository with
 ```bash
 cd ~
 git clone https://github.com/XuehuaOvO/cart_pole_diffusion_based_on_MPD.git
-git submodule update --init --recursive # Initialize and update the submodules
 cd cart_pole_diffusion_based_on_MPD
+git submodule update --init --recursive # Initialize and update the submodules
 ```
 
 Download [IsaacGym Preview 4](https://developer.nvidia.com/isaac-gym) via wget for remote container and extract it under `deps/isaacgym`
@@ -31,9 +31,17 @@ tar -xvf isaac-gym-preview-4
 ```
 
 Run the bash setup script to install everything.
-```
+```bash
 cd ~/cart_pole_diffusion_based_on_MPD
 bash setup.sh
+```
+
+Extra pkg for cart pole diffusion:
+```bash
+cd ~/cart_pole_diffusion_based_on_MPD
+bash setup.sh
+conda install -c conda-forge control slycot 
+conda install conda-forge::casadi
 ```
 
 Possible Errors:
@@ -101,6 +109,11 @@ gdown --id 1mmJAFg6M2I1OozZcyueKp_AP0HHkCq2k
 tar -xvf data_trajectories.tar.gz
 gdown --id 1I66PJ5QudCqIZ2Xy4P8e-iRBA8-e2zO1
 tar -xvf data_trained_models.tar.gz
+```
+
+To solve the possible error about pyopensll Version,
+```bash
+pip install --upgrade pyOpenSSL
 ```
 
 Run the inference script
