@@ -44,6 +44,9 @@ def experiment(
     use_ema: bool = True,
     use_amp: bool = False,
 
+    # model saving address
+    model_saving_address = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/data_trained_models',
+
     # Summary parameters
     steps_til_summary: int = 2000,
     summary_class: str = 'SummaryTrajectoryGeneration',
@@ -158,6 +161,7 @@ def experiment(
         use_ema=use_ema,
         use_amp=use_amp,
         debug=debug,
+        model_saving_address = model_saving_address,
         #text_conditioner = text_conditioner,
         tensor_args=tensor_args
     )
