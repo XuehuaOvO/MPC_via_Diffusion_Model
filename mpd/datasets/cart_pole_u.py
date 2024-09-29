@@ -9,13 +9,15 @@ from torch.utils.data import Dataset
 from mpd.datasets.normalization import DatasetNormalizer
 from mpd.utils.loading import load_params_from_yaml
 
-# repo = git.Repo('.', search_parent_directories=True)
-# print(f'repo -- {repo}')
-dataset_base_dir = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data' 
+
+# Dataset path setting
+DATASET_BASE_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data' 
 
 # Data Name Setting 
 U_DATA_NAME = 'u_tensor_420000-8-1.pt'
 X0_CONDITION_DATA_NAME = 'x0_tensor_420000-4.pt'
+
+dataset_base_dir = DATASET_BASE_PATH 
 
 class InputsDataset(Dataset, abc.ABC):
 
