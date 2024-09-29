@@ -32,14 +32,16 @@ tar -xvf isaac-gym-preview-4
 
 Run the bash setup script to install everything.
 ```bash
-conda install -c conda-forge control slycot 
-conda install conda-forge::casadi
+cd ~/cart_pole_diffusion_based_on_MPD
+bash setup.sh
 ```
 
 Extra pkg for cart pole diffusion:
 ```bash
 cd ~/cart_pole_diffusion_based_on_MPD
 bash setup.sh
+conda install -c conda-forge control slycot 
+conda install conda-forge::casadi
 ```
 
 Possible Errors:
