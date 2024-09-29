@@ -22,6 +22,8 @@ LEARNING_RATE = 3e-3
 
 EPOCHES = 300 # times that the whole data should be trained
 
+MODEL_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/420000_training_data'
+
 # LAUNCHER
 
 LOCAL = is_local()
@@ -135,8 +137,10 @@ for dataset_subdir, include_velocity, use_ema, variance_schedule, n_diffusion_st
         # num_train_steps=500000,
         num_train_steps = TRAINING_DATA_AMOUNT*EPOCHES/BATCH_SIZE, # 246093.75
 
+        model_saving_address = MODEL_SAVED_PATH,
+
         # steps_til_ckpt=50000,
-        steps_til_ckpt=10000,
+        steps_til_ckpt=10000, # 10000
 
         # steps_til_summary=20000,
         steps_til_summary=2000,
