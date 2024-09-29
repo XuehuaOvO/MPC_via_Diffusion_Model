@@ -112,7 +112,7 @@ conda activate mpd
 cd scripts/inference
 python Diffusion_MPC_Inference.py  
 ```
-
+The diffusion & mpc performance plot will be saved in the results_inference folder under the MODEL_PATH set in Diffusion_MPC_Inference.py.
 
 ---
 ## Running the MPD inference
