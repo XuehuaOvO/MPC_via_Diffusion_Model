@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # Attention: this py file can only set the initial range of position and theta, initial x_dot and theta_dot are always 0
 
 # data saving folder
-folder_path = "/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data_collecting"
+folder_path = "/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC"
 
 # control steps
 CONTROL_STEPS = 50
