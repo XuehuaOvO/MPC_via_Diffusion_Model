@@ -5,7 +5,7 @@ import torch
 import os
 import matplotlib.pyplot as plt
 
-############### Settings ######################
+############### Setting ######################
 # Attention: this py file can only set the initial range of position and theta, initial x_dot and theta_dot are always 0
 
 # data saving folder
