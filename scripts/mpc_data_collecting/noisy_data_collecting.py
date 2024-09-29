@@ -5,11 +5,11 @@ import torch
 import os
 import matplotlib.pyplot as plt
 
-############### Seetings ######################
+############### Settings ######################
 # Attention: this py file can only set the initial range of position and theta, initial x_dot and theta_dot are always 0
 
 # data saving folder
-folder_path = "/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC"
+FOLDER_PATH = "/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC"
 
 # control steps
 CONTROL_STEPS = 50
@@ -358,5 +358,5 @@ x0_conditioning_data = torch.cat((noisy_x_all, x_all_tensor), dim=0)
 print(f'x0_conditioning_data -- {x0_conditioning_data.size()}')
 
 # data saving
-torch.save(u_training_data, os.path.join(folder_path, U_DATA_NAME))
-torch.save(x0_conditioning_data, os.path.join(folder_path, X0_CONDITION_DATA_NAME))
+torch.save(u_training_data, os.path.join(FOLDER_PATH, U_DATA_NAME))
+torch.save(x0_conditioning_data, os.path.join(FOLDER_PATH, X0_CONDITION_DATA_NAME))

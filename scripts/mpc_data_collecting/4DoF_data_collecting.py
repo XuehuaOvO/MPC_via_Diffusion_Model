@@ -5,10 +5,10 @@ import torch
 import os
 import matplotlib.pyplot as plt
 
-############### Seetings #######################
+############### Setting #######################
 
 # data saving folder
-folder_path = "/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC"
+FOLDER_PATH = "/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC"
 
 # control steps
 CONTROL_STEPS = 30
@@ -249,10 +249,10 @@ print(f'first_x0 -- {x_all_tensor[0,:]}')
 print(f'first_pre_x -- {x_predicted_tensor[0,:,:]}')
 
 # save u data in PT file for training
-torch.save(u_all_tensor, os.path.join(folder_path, U_DATA_NAME))
+torch.save(u_all_tensor, os.path.join(FOLDER_PATH, U_DATA_NAME))
 
 # save x0 data in PT file as conditional info in training
-torch.save(x_all_tensor, os.path.join(folder_path, X0_CONDITION_DATA_NAME))
+torch.save(x_all_tensor, os.path.join(FOLDER_PATH, X0_CONDITION_DATA_NAME))
 
 # save x_predicted data in PT file for possible cost calculation
 # torch.save(x_predicted_tensor, os.path.join(folder_path, f'x_predicted_tensor_2400000-9-4.pt'))
