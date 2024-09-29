@@ -76,14 +76,33 @@ cd scripts/mpc_data_collecting
 python 4DoF_data_collecting.py
 ```
 
-## model training
-Training Data Name Setting:
+## cart pole model training
+Training Data Path and File Name Setting:
 In cart_pole_u.py, 
 ```python
-U_DATA_NAME = 'u_tensor_420000-8-1.pt'
-X0_CONDITION_DATA_NAME = 'x0_tensor_420000-4.pt'
+DATASET_BASE_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data' # training data path of the training data and condition data files
+
+U_DATA_NAME = 'u_tensor_420000-8-1.pt' # training data file name
+X0_CONDITION_DATA_NAME = 'x0_tensor_420000-4.pt' # condition data file name
 ```
 
+Training Launcg setting:
+In cart_pole_launch.py,
+```python
+# training data folder
+DATASET_SUBDIR = 'CartPole-LMPC' # the folder of the training data files (location: /root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC)
+
+# training data amount
+TRAINING_DATA_AMOUNT = 420000
+
+# learning parameters
+BATCH_SIZE = 512
+LEARNING_RATE = 3e-3
+
+EPOCHES = 300 # times that the whole data should be trained
+
+MODEL_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/420000_training_data'
+```
 
 ## Running the cart pole inference
 Based on a trained diffusion model, the cart pole inference is running via
