@@ -9,3 +9,5 @@ dependencies:
   - pip:
       - pyyaml
       - matplotlib
+      - casadi
+      - control
