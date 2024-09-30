@@ -30,7 +30,7 @@ WEIGHT_GUIDANC = 0.01 # non-conditioning weight
 X0_IDX = 150 # range:[0,199] 20*20 data 
 ITERATIONS = 50 # control loop (steps)
 HORIZON = 8 # mpc horizon
-U_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving'
+U_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/420000set'
 
 # cart pole dynamics
 def cart_pole_dynamics(x, u):
@@ -175,8 +175,10 @@ def experiment(
     x_track = np.zeros((4, num_loop+1))
     u_track = np.zeros((1, num_loop))
     u_horizon_track = np.zeros((num_loop, HORIZON))
+    x_horizon_track = np.zeros((num_loop, HORIZON+1, 4))
 
     x_track[:,0] = x0
+    x_updated_by_u = np.zeros((HORIZON+1, 4))
 
     for i in range(0, num_loop):
         x0 = torch.tensor(x0).to(device) # load data to cuda
@@ -251,6 +253,15 @@ def experiment(
         u_track[:,i] = applied_input
         u_horizon_track[i,:] = horizon_inputs
 
+        # update states along the horizon
+        x_updated_by_u[0,:] = x0
+        x0_horizon = np.squeeze(x0.numpy())
+        for z in range(0,horizon_inputs.shape[1]):
+            x_horizon_update = cart_pole_dynamics(x0_horizon, horizon_inputs[0,z])
+            x_updated_by_u[z+1,:] = x_horizon_update.T
+            x0_horizon = x_horizon_update
+        x_horizon_track[i,:,:] = np.round(x_updated_by_u, decimals=4)
+
         # update cart pole state
         x_next = cart_pole_dynamics(x0_array, applied_input)
         print(f'x_next-- {x_next}')
@@ -259,6 +270,15 @@ def experiment(
 
         # save the new state
         x_track[:,i+1] = x0
+
+        x_updated_by_u = np.zeros((HORIZON+1, 4))
+        x_updated_by_u[0,:] = x0
+
+        # save new starting state along the horizon
+        x_updated_by_u = np.zeros((HORIZON+1, 4))
+        x_updated_by_u[0,:] = x0
+
+
 
     # print all x and u 
     print(f'x_track-- {x_track.T}')
@@ -276,6 +296,8 @@ def experiment(
     # print(t.shape)
 
     N = HORIZON # prediction horizon
+    
+    x_mpc_horizon_track = np.zeros((num_loop, HORIZON+1, 4))
 
     # mpc parameters
     Q = np.diag([10, 1, 10, 1]) 
@@ -352,6 +374,8 @@ def experiment(
         print(f'x0_new-- {x0}')
         x_mpc_track[:,i+1] = x0
 
+        x_mpc_horizon_track[i,:,:] = np.round(X_sol.T, decimals=4)
+
         #save the first computed control input
         u_mpc_track[:,i] = U_sol[0]
         
@@ -387,10 +411,21 @@ def experiment(
     mpc_u_horizon_path = os.path.join(results_folder, mpc_u_horizon)
     np.save(mpc_u_horizon_path, u_mpc_horizon_track)
 
+    ########################## Diffusion & MPC States Results Saving ################################
+    # save diffusion states along horizon
+    diffusion_states = 'x_diffusion_horizon.npy'
+    diffusion_states_path = os.path.join(results_folder, diffusion_states)
+    np.save(diffusion_states_path, x_horizon_track)
+
+    # save mpc states along horizon
+    mpc_states = 'x_mpc_horizon.npy'
+    mpc_states_path = os.path.join(results_folder, mpc_states)
+    np.save(mpc_states_path, x_mpc_horizon_track)
+
     ########################## plot ################################
     num_i = num_loop
-    step = np.linspace(0,num_i+2,num_i+1)
-    step_u = np.linspace(0,num_i+1,num_i)
+    step = np.linspace(0,num_i,num_i+1)
+    step_u = np.linspace(0,num_i-1,num_i)
 
     plt.figure(figsize=(10, 8))
 
