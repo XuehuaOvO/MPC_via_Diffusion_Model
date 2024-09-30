@@ -61,109 +61,79 @@ for i in range(0,data_length):
     mpc_x_cost_array[:,i] = np.sum(single_mpc_x_cost,axis=0)
 
 
+######### diffusion and mpc states total costs ###########
+
+# diffusion total state cost along the control steps
+diffusion_total_state_cost = np.sum(diffusion_x_cost_array, axis = 0)
+
+# mpc total state cost along the control steps
+mpc_total_state_cost = np.sum(mpc_x_cost_array, axis = 0)
+
+
+############# states total costs difference ##############
+
+# difference along the control steps 
+state_cost_difference = diffusion_total_state_cost - mpc_total_state_cost 
+
+
 ######### Plot ###########
 
 num_i = data_length
 step = np.linspace(0,num_i-1,num_i)
 step_u = np.linspace(0,num_i-1,num_i)
 
-plt.figure(figsize=(10, 8))
+plt.figure(figsize=(10, 12))
 
-plt.subplot(5, 1, 1)
+plt.subplot(7, 1, 1)
 plt.plot(step, diffusion_x_cost_array[0, :])
 plt.plot(step, mpc_x_cost_array[0, :])
 plt.legend(['Diffusion Sampling', 'MPC']) 
-plt.ylabel('Position Cost (m)')
+plt.ylabel('Position Cost')
 plt.grid()
 
-plt.subplot(5, 1, 2)
+plt.subplot(7, 1, 2)
 plt.plot(step, diffusion_x_cost_array[1, :])
 plt.plot(step, mpc_x_cost_array[1, :])
-plt.ylabel('Velocity_Cost (m/s)')
+plt.ylabel('Velocity Cost')
 plt.grid()
 
-plt.subplot(5, 1, 3)
+plt.subplot(7, 1, 3)
 plt.plot(step, diffusion_x_cost_array[2, :])
 plt.plot(step, mpc_x_cost_array[2, :])
-plt.ylabel('Angle_cost (rad)')
+plt.ylabel('Angle Cost')
 plt.grid()
 
-plt.subplot(5, 1, 4)
+plt.subplot(7, 1, 4)
 plt.plot(step, diffusion_x_cost_array[3, :])
 plt.plot(step, mpc_x_cost_array[3, :])
-plt.ylabel('Ag Velocity_Cost (rad/s)')
+plt.ylabel('Ag Velocity Cost')
 plt.grid()
 
-plt.subplot(5, 1, 5)
+plt.subplot(7, 1, 5)
+plt.plot(step, diffusion_total_state_cost.reshape(data_length,))
+plt.plot(step, mpc_total_state_cost.reshape(data_length,))
+plt.ylabel('Total State Cost')
+plt.grid()
+
+plt.subplot(7, 1, 6)
+plt.plot(step, state_cost_difference.reshape(data_length,))
+plt.ylabel('Total State Cost Difference')
+plt.grid()
+
+plt.subplot(7, 1, 7)
 plt.plot(step_u, diffusion_u_cost_array.reshape(data_length,))
 plt.plot(step_u, mpc_u_cost_array.reshape(data_length,))
-plt.ylabel('Ctl Input (N)')
+plt.ylabel('Ctl Input Cost')
 plt.xlabel('Control Step')
 plt.grid()
 # plt.show()
+
+
 # save figure 
 figure_name = 'set_' + str(DATASET) + '_model_' + str(MODEL_NUM) + 'x0_' + str(X0_IDX) + '.png'
 figure_path = os.path.join(DATA_SAVED_PATH, figure_name)
 plt.savefig(figure_path)
 
-################# u results loading ###################
-
-# loaded_idx = [10000,30000,50000,70000]
-
-# for i in range(1,23):
-#     model_inx = 100000*i
-#     loaded_idx.append(model_inx)
-
-# print(f'loaded_model_idx -- {loaded_idx}')
-
-# u_mes_save = np.zeros((1, len(loaded_idx)))
-# u_horizon_mse_save = np.zeros((1, len(loaded_idx)))
-
-# m = 0
-
-# for n in loaded_idx:
-#     loading_folder = os.path.join(DATA_SAVED_PATH, 'model_'+ str(n), 'x0_'+ str(X0_IDX))
-
-#     u_diffusion_path = os.path.join(loading_folder, 'u_diffusion.npy')
-#     u_diffusion = np.load(u_diffusion_path)
-
-#     u_mpc_path = os.path.join(loading_folder, 'u_mpc.npy')
-#     u_mpc = np.load(u_mpc_path)
-
-#     u_diffusion_horizon_path = os.path.join(loading_folder, 'u_horizon_diffusion.npy')
-#     u_diffusion_horizon = np.load(u_diffusion_horizon_path)
-
-#     u_mpc_horizon_path = os.path.join(loading_folder, 'u_horizon_mpc.npy')
-#     u_mpc_horizon = np.load(u_mpc_horizon_path)
-    
-#     # calculate mse
-#     u_mse = np.mean((u_diffusion - u_mpc) ** 2)
-#     u_horizon_mse = np.mean((u_diffusion_horizon - u_mpc_horizon) ** 2)
-
-#     # save mse
-#     u_mes_save[0,m] = u_mse
-#     u_horizon_mse_save[0,m] = u_horizon_mse
-
-#     m += 1
-#     print(f'm -- {m}')
-
-
-# ################# Plotting ###################
-
-# plt.figure(figsize=(10, 10))
-
-# plt.plot(loaded_idx, u_mes_save[0, :])
-# plt.plot(loaded_idx, u_horizon_mse_save[0, :])
-# plt.yscale('log')
-# plt.legend(['u_mes', 'u_horizon_mse']) 
-# plt.ylabel('MSE value')
-# plt.xlabel('Iterations')
-# plt.grid()
-
-# # save figure 
-# plot_name = 'dataset_' + str(DATASET) + '_x0_' + str(X0_IDX) + '_Diffusion_MPC_MSE' + '.png'
-# plot_path = os.path.join(DATA_SAVED_PATH, plot_name)
-# plt.savefig(plot_path)
 
 
 
