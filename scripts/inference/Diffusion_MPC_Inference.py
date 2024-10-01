@@ -22,15 +22,18 @@ allow_ops_in_compiled_graph()
 
 
 TRAINED_MODELS_DIR = '../../trained_models/' 
-MODEL_FOLDER = '420000_models_with_noisy_data' # choose a main model folder saved in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
+MODEL_FOLDER = '180000_training_data' # choose a main model folder saved in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
+MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/180000_training_data/100000' # the absolute path of the trained model
+MODEL_ID = '100000' # number of training
 
-MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/420000_models_with_noisy_data/230000' # the absolute path of the trained model
-MODEL_ID = 230000 # number of training
+POSITION_INITIAL_RANGE = np.linspace(-1,1,15) 
+THETA_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4,15) 
 WEIGHT_GUIDANC = 0.01 # non-conditioning weight
-X0_IDX = 150 # range:[0,199] 20*20 data 
+X0_IDX = 95 # range:[0,199] 20*20 data 
 ITERATIONS = 50 # control loop (steps)
 HORIZON = 8 # mpc horizon
-U_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/420000set'
+
+RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/180000set'
 
 # cart pole dynamics
 def cart_pole_dynamics(x, u):
@@ -147,8 +150,8 @@ def experiment(
 
     #################################################################
     # load initial starting state x0
-    rng_x = np.linspace(-1,1,20) # 20 x_0 samples
-    rng_theta = np.linspace(-np.pi/4,np.pi/4,20) # 20 theta_0 samples
+    rng_x = POSITION_INITIAL_RANGE # 20 x_0 samples
+    rng_theta = THETA_INITIAL_RANGE # 20 theta_0 samples
     
     # all possible initial states combinations
     rng0 = []
@@ -305,8 +308,8 @@ def experiment(
     P = np.diag([100, 1, 100, 1])
 
     # Define the initial states range
-    rng_x = np.linspace(-1,1,20) 
-    rng_theta = np.linspace(-np.pi/4,np.pi/4,20) 
+    rng_x = POSITION_INITIAL_RANGE
+    rng_theta = THETA_INITIAL_RANGE
     rng0 = []
     for m in rng_x:
         for n in rng_theta:
@@ -390,7 +393,7 @@ def experiment(
 
     ########################## Diffusion & MPC Control Inputs Results Saving ################################
 
-    results_folder = os.path.join(U_SAVED_PATH, 'model_'+ str(MODEL_ID), 'x0_'+ str(X0_IDX))
+    results_folder = os.path.join(RESULTS_SAVED_PATH, 'model_'+ str(MODEL_ID), 'x0_'+ str(X0_IDX))
     os.makedirs(results_folder, exist_ok=True)
     
     # save the first u 
