@@ -67,7 +67,7 @@ def do_summary(
     # set model to training mode
     model.train()
 
-def save_models_to_disk(models_prefix_l, epoch, total_steps, checkpoints_dir=None):
+def save_nn_models_to_disk(models_prefix_l, epoch, total_steps, checkpoints_dir=None):
     for model, prefix in models_prefix_l:
         if model is not None:
             save_model_to_disk(model, epoch, total_steps, checkpoints_dir, prefix=f'{prefix}_')
@@ -320,7 +320,7 @@ stop_training = False
 train_steps_current = 0
 
 # save models before training
-save_models_to_disk([(model, 'model'), (ema_model, 'ema_model')], 0, 0, checkpoints_dir)
+save_nn_models_to_disk([(model, 'model'), (ema_model, 'ema_model')], 0, 0, checkpoints_dir)
 
 
 with tqdm(total=(len(train_dataloader)-1) * epochs, mininterval=1 if debug else 60) as pbar:
@@ -496,7 +496,7 @@ with tqdm(total=(len(train_dataloader)-1) * epochs, mininterval=1 if debug else 
             train_steps_current += 1
 
             if (steps_til_checkpoint is not None) and (train_steps_current % steps_til_checkpoint == 0):
-                save_models_to_disk([(model, 'model'), (ema_model, 'ema_model')],
+                save_nn_models_to_disk([(model, 'model'), (ema_model, 'ema_model')],
                                     epoch, train_steps_current, checkpoints_dir)
                 save_losses_to_disk(train_losses_l, validation_losses_l, checkpoints_dir)
                 print(f"\n-----------------------------------------")
@@ -523,7 +523,7 @@ with tqdm(total=(len(train_dataloader)-1) * epochs, mininterval=1 if debug else 
         ema.update_model_average(ema_model, model)
 
     # Save model at end of training
-    save_models_to_disk([(model, 'model'), (ema_model, 'ema_model')],
+    save_nn_models_to_disk([(model, 'model'), (ema_model, 'ema_model')],
                         epoch, train_steps_current, checkpoints_dir)
     save_losses_to_disk(train_losses_l, validation_losses_l, checkpoints_dir)
 
