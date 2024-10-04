@@ -348,5 +348,8 @@ def train(model=None, train_dataloader=None, epochs=None, lr=None, steps_til_sum
         save_models_to_disk([(model, 'model'), (ema_model, 'ema_model')],
                             epoch, train_steps_current, checkpoints_dir)
         save_losses_to_disk(train_losses_l, validation_losses_l, checkpoints_dir)
+        final_model_dir = os.path.join(saved_main_folder, 'final')
+        shutil.copytree(model_dir, final_model_dir)
+        print(f'Final model has been saved !!!')
 
         print(f'\n------- TRAINING FINISHED -------')
