@@ -26,10 +26,10 @@ MODEL_FOLDER = '180000_training_data' # choose a main model folder saved in the 
 MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/180000_training_data/100000' # the absolute path of the trained model
 MODEL_ID = '100000' # number of training
 
-POSITION_INITIAL_RANGE = np.linspace(-1,1,15) 
-THETA_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4,15) 
+POSITION_INITIAL_RANGE = np.linspace(-1,1,5) 
+THETA_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4,5) 
 WEIGHT_GUIDANC = 0.01 # non-conditioning weight
-X0_IDX = 95 # range:[0,199] 20*20 data 
+X0_IDX = 18 # range:[0,199] 20*20 data 
 ITERATIONS = 50 # control loop (steps)
 HORIZON = 8 # mpc horizon
 
@@ -170,7 +170,8 @@ def experiment(
 
 
     #initial context
-    x0 = np.array([[x_0 , 0, theta_0, 0]])  # np.array([[x_0 , 0, theta_0, 0]])  
+    x0 = np.array([[x_0 , 0, theta_0, 0]])  # np.array([[x_0 , 0, theta_0, 0]]) 
+    initial_state = x0   
 
     ############################################################################
     # sampling loop
@@ -484,6 +485,8 @@ def experiment(
 
     u_difference = np.sum(np.abs(u_track.reshape(num_loop,) - u_mpc_track.reshape(num_loop,)))
     print(f'u_difference - {u_difference}')
+
+    print(f'initial_state -- {initial_state}')
 
 
 
