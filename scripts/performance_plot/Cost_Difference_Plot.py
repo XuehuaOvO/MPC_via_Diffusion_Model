@@ -7,10 +7,12 @@ import matplotlib.pyplot as plt
 import torch
 
 
-DATASET = 420000
-MODEL_NUM = 230000
-DATA_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/420000set/model_230000/x0_150'
-X0_IDX = 150
+DATASET = 180000
+MODEL_NUM = 180000
+DATA_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/nn_180000/model_nn_180000/x0_18'
+X0_IDX = 'interpolated_18'
+
+TRAINING_MODEL_TYPE = 'NN' # Diffusion or NN
 
 ################# performance results loading ###################
 
@@ -87,8 +89,9 @@ plt.figure(figsize=(10, 12))
 plt.subplot(7, 1, 1)
 plt.plot(step, diffusion_x_cost_array[0, :])
 plt.plot(step, mpc_x_cost_array[0, :])
-plt.legend(['Diffusion Sampling', 'MPC']) 
+plt.legend([TRAINING_MODEL_TYPE + ' Sampling', 'MPC']) 
 plt.ylabel('Position Cost')
+plt.title( TRAINING_MODEL_TYPE + '& MPC Cost Plots')
 plt.grid()
 
 plt.subplot(7, 1, 2)
@@ -117,7 +120,7 @@ plt.grid()
 
 plt.subplot(7, 1, 6)
 plt.plot(step, state_cost_difference.reshape(data_length,))
-plt.ylabel('Total State Cost Difference')
+plt.ylabel('Cost Difference ('+ TRAINING_MODEL_TYPE +'-MPC)') # Total State Cost Difference
 plt.grid()
 
 plt.subplot(7, 1, 7)
@@ -130,7 +133,7 @@ plt.grid()
 
 
 # save figure 
-figure_name = 'set_' + str(DATASET) + '_model_' + str(MODEL_NUM) + 'x0_' + str(X0_IDX) + '.png'
+figure_name = TRAINING_MODEL_TYPE + '_set_' + str(DATASET) + '_model_' + str(MODEL_NUM) + 'x0_' + str(X0_IDX) + '.png'
 figure_path = os.path.join(DATA_SAVED_PATH, figure_name)
 plt.savefig(figure_path)
 
