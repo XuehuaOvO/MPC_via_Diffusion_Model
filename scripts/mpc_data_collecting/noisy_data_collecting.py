@@ -15,17 +15,17 @@ FOLDER_PATH = "/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data
 CONTROL_STEPS = 50
 
 # data range
-POSITION_INITIAL_RANGE = np.linspace(-1,1,10) 
-THETA_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4,10) 
+POSITION_INITIAL_RANGE = np.linspace(-1,1,15) 
+THETA_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4,15) 
 
 # number of noisy data for each state
-NUM_NOISY_DATA = 20
+NUM_NOISY_DATA = 15
 
 N = 8 # mpc prediction horizon
 
 # trainind data files name
-U_DATA_NAME = 'u_tensor_105000-8-1.pt' # 400000: training data amount, 8: horizon length, 1:channels --> 400000-8-1: tensor size for data trainig 
-X0_CONDITION_DATA_NAME = 'x0_tensor_105000-4.pt' # 400000-4: tensor size for conditioning data in training
+U_DATA_NAME = 'u_tensor_180000-8-1.pt' # 400000: training data amount, 8: horizon length, 1:channels --> 400000-8-1: tensor size for data trainig 
+X0_CONDITION_DATA_NAME = 'x0_tensor_180000-4.pt' # 400000-4: tensor size for conditioning data in training
 
 np.random.seed(42)
 
