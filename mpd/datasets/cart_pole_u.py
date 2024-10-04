@@ -14,8 +14,8 @@ from mpd.utils.loading import load_params_from_yaml
 DATASET_BASE_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data' 
 
 # Data Name Setting 
-U_DATA_NAME = 'u_tensor_420000-8-1.pt'
-X0_CONDITION_DATA_NAME = 'x0_tensor_420000-4.pt'
+U_DATA_NAME = 'u_tensor_180000-8-1.pt'
+X0_CONDITION_DATA_NAME = 'x0_tensor_180000-4.pt'
 
 dataset_base_dir = DATASET_BASE_PATH 
 
@@ -60,6 +60,7 @@ class InputsDataset(Dataset, abc.ABC):
         self.n_support_points = h
         self.state_dim = d  # state dimension used for the diffusion model
         self.inputs_dim = (self.n_support_points, d)
+        # print(f'fields -- {self.fields}')
 
         # normalize the inputs (for the diffusion model)
         self.normalizer = DatasetNormalizer(self.fields, normalizer=normalizer)
