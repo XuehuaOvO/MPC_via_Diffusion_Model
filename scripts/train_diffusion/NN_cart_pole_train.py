@@ -2,8 +2,8 @@ import numpy as np
 import os
 import torch
 import torch.nn as nn
-import wandb
-import git
+# import wandb
+# import git
 import shutil
 from tqdm.autonotebook import tqdm
 import copy
@@ -11,13 +11,18 @@ from torch_robotics.torch_utils.torch_timer import TimerCUDA
 from torch_robotics.torch_utils.torch_utils import dict_to_device, DEFAULT_TENSOR_ARGS, to_numpy
 from collections import defaultdict
 
-from experiment_launcher import single_experiment_yaml, run_experiment
-from mpd import trainer
-from mpd.models import UNET_DIM_MULTS, ConditionedTemporalUnet
-from mpd.trainer import get_dataset, get_model, get_loss, get_summary
-from mpd.trainer.trainer import get_num_epochs
+# from experiment_launcher import single_experiment_yaml, run_experiment
+# from mpd import trainer
+# from mpd.models import UNET_DIM_MULTS, ConditionedTemporalUnet
+from mpd.trainer import get_dataset # , get_model, get_loss, get_summary
+# from mpd.trainer.trainer import get_num_epochs
 from torch_robotics.torch_utils.seed import fix_random_seed
 from torch_robotics.torch_utils.torch_utils import get_torch_device
+
+########## Setting ############
+BATCH_SIZE = 512
+MODEL_SAVED_DIRECTORY = 'logs/nn_180000' # under the train_diffusion folder
+
 
 
 class EMA:
@@ -89,8 +94,8 @@ def save_losses_to_disk(train_losses, val_losses, checkpoints_dir=None):
     np.save(os.path.join(checkpoints_dir, f'train_losses.npy'), train_losses)
     np.save(os.path.join(checkpoints_dir, f'val_losses.npy'), val_losses)
 
+# fixed seed
 seed = 0
-
 fix_random_seed(seed)
 
 # AMPC Model
@@ -103,7 +108,7 @@ class AMPCNet(nn.Module):
         self.hidden3 = nn.Linear(50, 50)         # Third hidden layer with 50 neurons
         self.output = nn.Linear(50, output_size) # Output layer
 
-    def forward(self, x):
+    def forward(self, x, batch_size):
         # Forward pass through the network with the specified activations
         x = torch.tanh(self.hidden1(x))          # Tanh activation for first hidden layer
         x = torch.tanh(self.hidden2(x))          # Tanh activation for second hidden layer
@@ -111,7 +116,7 @@ class AMPCNet(nn.Module):
         x = self.output(x)                       # Linear activation (no activation function) for the output layer
 
         # reshape the output
-        x = x.view(512, 8, 1) # 512(batch size)*8*1
+        x = x.view(batch_size, 8, 1) # 512(batch size)*8*1
 
         return x
     
@@ -130,36 +135,23 @@ dataset_subdir = 'CartPole-LMPC'
 include_velocity = False
 
 ########################################################################
-# Diffusion Model
-# diffusion_model_class: str = 'GaussianDiffusionModel',
-# variance_schedule: str = 'exponential',  # cosine
-# n_diffusion_steps: int = 25,
-# predict_epsilon: bool = True,
-
-# Unet
-# unet_input_dim: int = 32,
-# unet_dim_mults_option: int = 1,
-
-########################################################################
-# Loss
-# loss_class: str = 'GaussianDiffusionCartPoleLoss',
 
 # Training parameters
-batch_size = 512
+batch_size = BATCH_SIZE
 lr = 3e-3
-num_train_steps = 5000 # 50000
+# num_train_steps = 5000
 
 use_ema = True
 use_amp = False
 
 # model saving address
-model_saving_address = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/data_trained_models/nn_180000'
+model_saving_address =  '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/180000_training_data'
 
 # Summary parameters
 steps_til_summary = 2000
-summary_class = 'SummaryTrajectoryGeneration'
+# summary_class = 'SummaryTrajectoryGeneration'
 
-steps_til_ckpt = 10000
+# steps_til_ckpt = 10000
 
 ########################################################################
 device = 'cuda'
@@ -168,8 +160,8 @@ debug = True
 
 ########################################################################
 # MANDATORY
-# seed = 0
-results_dir = 'logs/nn_180000'
+
+results_dir = MODEL_SAVED_DIRECTORY
 os.makedirs(results_dir, exist_ok=True)
 ema_decay = 0.995
 step_start_ema = 1000 
@@ -179,18 +171,13 @@ steps_per_validation=10
 clip_grad=False
 clip_grad_max_norm=1.0
 max_steps=None
-steps_til_checkpoint=90000
+steps_til_checkpoint=100000
 train_losses_info = {}
 val_loss_info = {}
 
 ########################################################################
-# WandB
-# wandb_mode: str = 'disabled',  # "online", "offline" or "disabled"
-# wandb_entity: str = 'scoreplan',
-# wandb_project: str = 'test_train',
-# **kwargs
-# ):
 
+# device
 device = get_torch_device(device=device)
 print(f'device --{device}')
 tensor_args = {'device': device, 'dtype': torch.float32}
@@ -199,18 +186,6 @@ tensor_args = {'device': device, 'dtype': torch.float32}
 model = model.to(device)
 
 # Dataset
-# DATASET_BASE_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data' 
-
-# U_DATA_NAME = 'u_tensor_180000-8-1.pt'
-# X0_CONDITION_DATA_NAME = 'x0_tensor_180000-4.pt'
-
-# x_train = torch.load(os.path.join(DATASET_BASE_PATH, X0_CONDITION_DATA_NAME),map_location=tensor_args['device']) # 180000*4
-# y_train = torch.load(os.path.join(DATASET_BASE_PATH, U_DATA_NAME),map_location=tensor_args['device']) # 180000*8*1
-
-# if use_ema:
-#     # Exponential moving average model
-#     ema = EMA(beta=ema_decay)
-#     ema_model = copy.deepcopy(model)
 
 train_subset, train_dataloader, val_subset, val_dataloader = get_dataset(
     dataset_class='InputsDataset',
@@ -230,7 +205,7 @@ print(f'dataset -- {dataset}')
 loss_fn = val_loss_fn = criterion = torch.nn.MSELoss()
 
 # Optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+# optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
 model.train()
 
@@ -238,47 +213,6 @@ model.train()
 epochs = 300
 
 train_steps_current = 0
-
-# for epoch in range(epochs):
-#     running_loss = 0.0  # To track the loss
-#     for batch_idx, train_batch_dict in enumerate(train_dataloader):
-#         # derive the inputs and targets
-#         inputs = train_batch_dict['condition_normalized']
-#         print(f'inputs size -- {inputs.size()}')
-#         targets = train_batch_dict['inputs_normalized']
-#         print(f'targets size -- {targets.size()}')
-        
-        
-#         # Zero the parameter gradients to avoid accumulation
-#         optimizer.zero_grad()
-
-#         # Forward pass: Get predictions from the model
-#         outputs = model(inputs)
-        
-#         # Compute the loss
-#         loss = criterion(outputs, targets) # mean error
-
-#         # Backward pass: Compute gradients and update weights
-#         loss.backward()   # Compute gradients
-#         optimizer.step()  # Update weights based on gradients
-
-#         # # Update EMA
-#         # if ema_model is not None:
-#         #     if train_steps_current % update_ema_every == 0:
-#         #         # update ema
-#         #         if train_steps_current < step_start_ema:
-#         #             # reset parameters ema
-#         #             ema_model.load_state_dict(model.state_dict())
-#         #         ema.update_model_average(ema_model, model)
-#         # # ema.update(model)
-
-#         # Track the running loss
-#         # running_loss += loss.item()
-#     print(f'batch idx -- {batch_idx}')
-#     print(f"Epoch {epoch + 1}/{epochs}, Loss: {loss.item():.4f}")
-
-#     # Print the average loss for this epoch
-#     # avg_loss = running_loss / len(train_loader)
 
 model_dir=results_dir
 
@@ -346,21 +280,17 @@ with tqdm(total=(len(train_dataloader)-1) * epochs, mininterval=1 if debug else 
                 # print(f'targets size -- {targets.size()}')
 
                 # Forward pass: Get predictions from the model
-                outputs = model(inputs)
+                outputs = model(inputs,batch_size)
 
                 # Compute the loss
                 loss = criterion(outputs, targets)
-
-                # Compute losses
-                # with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=use_amp):
-                #     train_losses, train_losses_info = loss_fn(model, train_batch_dict, train_subset.dataset)
 
                 train_loss_batch = 0.
                 train_losses_log = {}
                 # for loss_name, loss in loss.item():
                 single_loss = loss.mean()
                 train_loss_batch += single_loss
-                    # train_losses_log[loss_name] = to_numpy(single_loss).item()
+                    # train_losses_log
 
             ####################################################################################################
             # SUMMARY
@@ -406,14 +336,11 @@ with tqdm(total=(len(train_dataloader)-1) * epochs, mininterval=1 if debug else 
                             # print(f'targets_val size -- {targets_val.size()}')
 
                             # Forward pass: Get predictions from the model
-                            outputs_val = model(inputs_val)
+                            outputs_val = model(inputs_val,batch_size = batch_size)
 
                             # Compute the loss
                             loss_val = criterion(outputs_val, targets_val)
 
-                            # val_loss, val_loss_info = loss_fn(
-                            #     model, batch_dict_val, val_subset.dataset, step=train_steps_current)
-                            # for name, value in val_loss.items():
                             name = 'NN Loss'
                             single_loss = to_numpy(loss_val)
                             val_losses[name].append(single_loss)
