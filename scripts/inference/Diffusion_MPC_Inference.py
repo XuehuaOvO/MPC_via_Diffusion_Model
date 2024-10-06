@@ -21,15 +21,15 @@ from torch_robotics.torch_utils.torch_utils import get_torch_device, freeze_torc
 allow_ops_in_compiled_graph()
 
 
-TRAINED_MODELS_DIR = '../../trained_models/' 
-MODEL_FOLDER = '180000_training_data' # choose a main model folder saved in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
+TRAINED_MODELS_DIR = '../../trained_models/' # main loader of all saved trained models
+MODEL_FOLDER = '180000_training_data' # choose a folder in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
 MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/180000_training_data/100000' # the absolute path of the trained model
 MODEL_ID = '100000' # number of training
 
 POSITION_INITIAL_RANGE = np.linspace(-1,1,5) 
 THETA_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4,5) 
 WEIGHT_GUIDANC = 0.01 # non-conditioning weight
-X0_IDX = 18 # range:[0,199] 20*20 data 
+X0_IDX = 18 # range:[0,24] 5*5 data 
 ITERATIONS = 50 # control loop (steps)
 HORIZON = 8 # mpc horizon
 
