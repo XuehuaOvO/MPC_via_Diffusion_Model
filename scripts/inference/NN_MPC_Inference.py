@@ -210,6 +210,10 @@ def experiment(
     x_track[:,0] = x0
     x_updated_by_u = np.zeros((HORIZON+1, 4))
 
+    # time recording 
+    NN_total_time = 0
+    MPC_total_time = 0
+
     for i in range(0, num_loop):
         x0 = torch.tensor(x0).to(device) # load data to cuda
 
@@ -282,7 +286,11 @@ def experiment(
         # inputs_final = inputs_iters[-1]
 
         with torch.no_grad():
-            nn_output = model(nn_input)
+            with TimerCUDA() as t_NN_sampling:
+                nn_output = model(nn_input)
+            print(f't_NN_sampling: {t_NN_sampling.elapsed:.4f} sec')
+            single_NN_time = np.round(t_NN_sampling.elapsed,4)
+            NN_total_time += single_NN_time
             inputs_final = dataset.unnormalize_states(nn_output)
 
         print(f'control_inputs -- {inputs_final}')
@@ -412,7 +420,11 @@ def experiment(
 
         optimizer.minimize(cost)
         optimizer.solver('ipopt')
-        sol = optimizer.solve()
+        with TimerCUDA() as t_MPC_sampling:
+            sol = optimizer.solve()
+        print(f't_MPC_sampling: {t_MPC_sampling.elapsed:.4f} sec')
+        single_MPC_time = np.round(t_MPC_sampling.elapsed,4)
+        MPC_total_time += single_MPC_time
 
         X_sol = sol.value(X_pre)
         # print(f'X_sol_shape -- {X_sol.shape}')
@@ -533,6 +545,9 @@ def experiment(
     print(f'u_difference - {u_difference}')
 
     print(f'initial_state -- {initial_state}')
+
+    print(f'NN_total_time -- {NN_total_time}')
+    print(f'MPC_total_time -- {MPC_total_time}')
 
 
 

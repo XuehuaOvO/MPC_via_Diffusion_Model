@@ -184,6 +184,10 @@ def experiment(
     x_track[:,0] = x0
     x_updated_by_u = np.zeros((HORIZON+1, 4))
 
+    # time recording 
+    Diffusion_total_time = 0
+    MPC_total_time = 0
+
     for i in range(0, num_loop):
         x0 = torch.tensor(x0).to(device) # load data to cuda
 
@@ -224,7 +228,7 @@ def experiment(
 
         ########
         # Sample u with classifier-free-guidance (CFG) diffusion model
-        with TimerCUDA() as timer_model_sampling:
+        with TimerCUDA() as t_diffusion_time:
             inputs_normalized_iters = model.run_CFG(
                 context, hard_conds, context_weight,
                 n_samples=n_samples, horizon=n_support_points,
@@ -232,7 +236,9 @@ def experiment(
                 sample_fn=ddpm_cart_pole_sample_fn,
                 n_diffusion_steps_without_noise=n_diffusion_steps_without_noise,
             )
-        print(f't_model_sampling: {timer_model_sampling.elapsed:.3f} sec')
+        print(f't_model_sampling: {t_diffusion_time.elapsed:.4f} sec')
+        single_Diffusion_time = np.round(t_diffusion_time.elapsed,4)
+        Diffusion_total_time += single_Diffusion_time
         # t_total = timer_model_sampling.elapsed
 
         ########
@@ -366,7 +372,11 @@ def experiment(
 
         optimizer.minimize(cost)
         optimizer.solver('ipopt')
-        sol = optimizer.solve()
+        with TimerCUDA() as t_MPC_sampling:
+            sol = optimizer.solve()
+        print(f't_MPC_sampling: {t_MPC_sampling.elapsed:.4f} sec')
+        single_MPC_time = np.round(t_MPC_sampling.elapsed,4)
+        MPC_total_time += single_MPC_time
 
         X_sol = sol.value(X_pre)
         # print(f'X_sol_shape -- {X_sol.shape}')
@@ -487,6 +497,9 @@ def experiment(
     print(f'u_difference - {u_difference}')
 
     print(f'initial_state -- {initial_state}')
+
+    print(f'Diffusion_total_time -- {Diffusion_total_time}')
+    print(f'MPC_total_time -- {MPC_total_time}')
 
 
 
