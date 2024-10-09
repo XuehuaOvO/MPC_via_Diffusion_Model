@@ -31,10 +31,10 @@ MODEL_FOLDER = 'nmpc_672000_training_data' # choose a main model folder saved in
 MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nmpc_672000_training_data/300000' # the absolute path of the trained model
 MODEL_ID = '300000' # number of training
 
-POSITION_INITIAL_RANGE = np.linspace(-0.5,0.5,10) # np.linspace(-1,1,5)
-THETA_INITIAL_RANGE = np.linspace(3*np.pi/4,5*np.pi/4,20) # np.linspace(-np.pi/4,np.pi/4,5)
+POSITION_INITIAL_RANGE = np.linspace(-0.5, 0.5,10) # np.linspace(-1,1,5)
+THETA_INITIAL_RANGE = np.linspace(3*np.pi/4, 5*np.pi/4, 20) # np.linspace(-np.pi/4,np.pi/4,5)
 WEIGHT_GUIDANC = 0.01 # non-conditioning weight
-X0_IDX = 0 # range:[0,199] 20*20 data 
+X0_IDX = 50 # range:[0,199] 20*20 data 
 ITERATIONS = 80 # control loop (steps) 50
 HORIZON = 64 # mpc horizon 8
 
@@ -135,6 +135,26 @@ def EulerForwardCartpole_virtual_Casadi(dynamic_update_virtual_Casadi, dt, x,u) 
     xdot = dynamic_update_virtual_Casadi(x,u)
     return x + xdot * dt
 
+def EulerForwardCartpole_virtual_4DoF(dt, x,u) -> ca.vertcat:
+    xdot = np.array([
+        x[1],            # xdot 
+
+        ( MPLP * -np.sin(x[2]) * x[3]**2 
+          +MPG * np.sin(x[2]) * np.cos(x[2])
+          + u 
+          )/(M_TOTAL - M_POLE*np.cos(x[2]))**2, # xddot
+
+        -PI_UNDER_2 * (x[2]-np.pi) * x[3],        # theta_star_dot
+
+        ( -MPLP * np.sin(x[2]) * np.cos(x[2]) * x[3]**2
+          -MTG * np.sin(x[2])
+          -np.cos(x[2])*u
+          )/(MTLP - MPLP*np.cos(x[2])**2) # thetaddot
+        
+        # -PI_UNDER_2 * (x[2]-np.pi) * x[3]   # theta_stat_dot
+    ])
+    return x + xdot * dt
+
 def dynamic_update_NMPC_cartpole_4DoF_Casadi(x, u) -> ca.vertcat:
     return ca.vertcat(
         x[1],            # xdot 
@@ -185,9 +205,9 @@ opts_setting = {'ipopt.max_iter':20000, 'ipopt.acceptable_tol':1e-8, 'ipopt.acce
 NUM_STATE = 4
 Q_REDUNDANT = 1000.0
 P_REDUNDANT = 1000.0
-Q = np.diag([0.01, 0.01, 0, 0.01, Q_REDUNDANT])
+Q = np.diag([0.01, 0.01, 0, 0.01, Q_REDUNDANT]) #Q = np.diag([0.01, 0.01, Q_REDUNDANT, 0.01])
 R = 0.001
-P = np.diag([0.01, 0.1, 0, 0.1, P_REDUNDANT])
+P = np.diag([0.01, 0.1, 0, 0.1, P_REDUNDANT]) #P = np.diag([0.01, 0.1, P_REDUNDANT, 0.1])
 
 
 TS = 0.01
@@ -236,36 +256,23 @@ def MPC_Solve( system_update, system_dynamic, x0:np.array, initial_guess_x:float
 
     optimizer_normal.minimize(cost)
     optimizer_normal.solver('ipopt',opts_setting)
-    sol = optimizer_normal.solve()
+
+    with TimerCUDA() as t_NMPC_sampling:
+        sol = optimizer_normal.solve()
+    print(f't_MPC_sampling: {t_NMPC_sampling.elapsed:.4f} sec')
+    single_NMPC_time = np.round(t_NMPC_sampling.elapsed,4)
+    # NMPC_total_time += single_MPC_time
+
+    # sol = optimizer_normal.solve()
     X_sol = sol.value(X_pre)
     U_sol = sol.value(U_pre)
     Cost_sol = sol.value(cost)
-    return X_sol, U_sol, Cost_sol
+    return X_sol, U_sol, Cost_sol, single_NMPC_time
 
-def MPC_NormalData_Process(x0, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_result_normal, j_result_normal, x_result_normal, idx_control_step=0) -> float:
-    u_for_normal_x = np.zeros(HORIZON)
-    
-    X_sol, U_sol, Cost_sol = MPC_Solve(EulerForwardCartpole_virtual_Casadi, dynamic_update_virtual_Casadi, x0, x_ini_guess, u_ini_guess, NUM_STATE, HORIZON, Q, R, TS, opts_setting)
-    u_for_normal_x = U_sol.reshape(HORIZON,1)
-    j_for_normal_x = np.array(Cost_sol)
-    # save normal x,u,j data in 0th step 
-    idx_0step_normal_data = idx_group_of_control_step*(ITERATIONS) + idx_control_step
-    
-    
-    # shared memory with manager list
-    x_result_normal[idx_0step_normal_data] = x0.tolist()
-    u_result_normal[idx_0step_normal_data] = u_for_normal_x.tolist()
-    j_result_normal[idx_0step_normal_data] = j_for_normal_x.tolist()
-    
-    # print normal
-    print('-----------------------------------------normal result--------------------------------------------------------')
-    print(f'(idx_ini_guess*num_datagroup+turn, control step) -- {idx_group_of_control_step, idx_control_step}')
-    # print(f'u_sol-- {U_sol[0]}')
-    # print(f'x0_new-- {X_sol[:,0]}')
-    # print(f'cost-- {Cost_sol}')
-    
-    return U_sol[0]
+# MPC_NormalData_Process
 
+
+# EulerForwardCartpole_virtual
 def EulerForwardCartpole_virtual(dt, x,u) -> ca.vertcat:
     xdot = np.array([
         x[1],            # xdot 
@@ -284,66 +291,11 @@ def EulerForwardCartpole_virtual(dt, x,u) -> ca.vertcat:
     ])
     return x + xdot * dt
 
-def MPC_NoiseData_Process( x0, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_result_noise, j_result_noise, x_result_noise, idx_control_step=0, bAll = False):
-    noisey_x = np.zeros((NUM_NOISY_DATA, NUM_STATE))
-    u_for_noisy_x = np.zeros((NUM_NOISY_DATA, HOR, 1))
-    j_for_noisy_x = np.zeros((NUM_NOISY_DATA))
-    for idx_noisy in range(0,NUM_NOISY_DATA):
-        if (bAll == True): 
-            noise = np.random.normal(NOISE_MEAN, NOISE_SD, size = NUM_STATE)
-            noisy_state = x0 + noise
-        else:
-            noise = np.random.normal(NOISE_MEAN, NOISE_SD, size = (1,2))
-            noisy_state = x0 + [noise[0,0], 0, noise[0,1],0,0]
-        
-        noisy_state[IDX_THETA_RED] = ThetaToRedTheta(noisy_state[IDX_THETA])
-        noisey_x[idx_noisy,:] = noisy_state
-        X_noise_sol, U_noisy_sol, Cost_noise_sol = MPC_Solve(EulerForwardCartpole_virtual_Casadi, dynamic_update_virtual_Casadi, noisey_x[idx_noisy,:], x_ini_guess, u_ini_guess, NUM_STATE, HOR, Q, R, TS, opts_setting)
-        
-        # gey u, j by x
-        u_for_noisy_x[idx_noisy,:,:] = U_noisy_sol.reshape(1,HOR,1)
-        j_for_noisy_x[idx_noisy] = Cost_noise_sol
+# MPC_NoiseData_Process
 
 
-    # save noise x,u,j data in 0th step 
-    idx_start_0step_nosie_data = idx_group_of_control_step*CONTROLSTEP_X_NUMNOISY + idx_control_step*NUM_NOISY_DATA
-    idx_end_0step_nosie_data = idx_start_0step_nosie_data + NUM_NOISY_DATA
-    
-    # shared memory with manager list
-    x_result_noise[idx_start_0step_nosie_data:idx_end_0step_nosie_data] = noisey_x.tolist()
-    u_result_noise[idx_start_0step_nosie_data:idx_end_0step_nosie_data] = u_for_noisy_x.tolist()
-    j_result_noise[idx_start_0step_nosie_data:idx_end_0step_nosie_data] = j_for_noisy_x.tolist()
+# RunMPCForSingle_IniState_IniGuess
 
-def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_group_of_control_step:int,x0_state:np.array, 
-                                      x_result_normal:torch.tensor, u_result_normal:torch.tensor, j_result_normal:torch.tensor,
-                                      x_result_noisy:torch.tensor, u_result_noisy:torch.tensor, j_result_noisy:torch.tensor):
-
-    ################ generate data for 0th step ##########################################################
-    try:
-        # normal at x0
-        u0 = MPC_NormalData_Process(x0_state, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_result_normal, j_result_normal, x_result_normal)
-        
-        # noisy at x0
-        MPC_NoiseData_Process(x0_state, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_result_noisy, j_result_noisy, x_result_noisy)
-        
-        ############################################## generate data for control step loop ##############################################
-        # main mpc loop
-        for idx_control_step in range(1, ITERATIONS):
-            #system dynamic update x 
-            x0_next = EulerForwardCartpole_virtual(TS,x0_state,u0)
-            
-            ################################################# normal mpc loop to update state #################################################
-            u0_cur = MPC_NormalData_Process(x0_next, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_result_normal, j_result_normal, x_result_normal,idx_control_step)
-
-            ################################## noise  ##################################
-            MPC_NoiseData_Process(x0_next, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_result_noisy, j_result_noisy, x_result_noisy, idx_control_step, True)
-            
-            # update
-            x0_state = x0_next
-            u0 = u0_cur
-    
-    except Exception as e:
-        print(f"Error: {e}")
 
 
 @single_experiment_yaml
@@ -453,7 +405,6 @@ def experiment(
 
     # time recording 
     NN_total_time = 0
-    MPC_total_time = 0
 
     for i in range(0, num_loop):
         x0 = torch.tensor(x0).to(device) # load data to cuda
@@ -557,13 +508,13 @@ def experiment(
         x0_horizon = np.squeeze(x0.numpy())
         for z in range(0,horizon_inputs.shape[1]):
             #x_horizon_update = cart_pole_dynamics(x0_horizon, horizon_inputs[0,z])
-            x_horizon_update = EulerForwardCartpole_virtual_Casadi(dynamic_update_NMPC_cartpole_4DoF_Casadi,TS,x0_horizon,horizon_inputs[0,z])
+            x_horizon_update = EulerForwardCartpole_virtual_4DoF(TS,x0_horizon,horizon_inputs[0,z])
             x_updated_by_u[z+1,:] = x_horizon_update.T
             x0_horizon = x_horizon_update
         x_horizon_track[i,:,:] = np.round(x_updated_by_u, decimals=4)
 
         # update cart pole state
-        x_next = EulerForwardCartpole_virtual_Casadi(dynamic_update_NMPC_cartpole_4DoF_Casadi,TS,x0_array,applied_input) # cart_pole_dynamics(x0_array, applied_input)
+        x_next = EulerForwardCartpole_virtual_4DoF(TS,x0_array,applied_input) # cart_pole_dynamics(x0_array, applied_input)
         print(f'x_next-- {x_next}')
         x0 = np.array(x_next)
         x0 = x0.T # transpose matrix
@@ -597,7 +548,7 @@ def experiment(
 
     N = HORIZON # prediction horizon
     
-    x_nmpc_horizon_track = np.zeros((INITIAL_GUESS_NUM*num_loop, HORIZON+1, NUM_STATE))
+    x_nmpc_horizon_track = np.zeros((INITIAL_GUESS_NUM*num_loop, HORIZON+1, NUM_STATE)) # 2*80,64+1,4
 
     # # mpc parameters
     # Q = np.diag([10, 1, 10, 1]) 
@@ -618,9 +569,11 @@ def experiment(
     # ##### data collecting loop #####
 
     # data set for each turn
-    x_nmpc_track = np.zeros((NUM_STATE, INITIAL_GUESS_NUM*(num_loop+1))) # 4*
-    u_nmpc_track = np.zeros((INITIAL_GUESS_NUM, num_loop))
-    u_nmpc_horizon_track = np.zeros((INITIAL_GUESS_NUM*num_loop, HORIZON))
+    x_nmpc_track = np.zeros((NUM_STATE+1, INITIAL_GUESS_NUM*(num_loop+1))) # 4,2*(80+1)
+    u_nmpc_track = np.zeros((INITIAL_GUESS_NUM, num_loop)) # 2,80
+    u_nmpc_horizon_track = np.zeros((INITIAL_GUESS_NUM*num_loop, HORIZON)) # 2*80,64
+
+    NMPC_total_time_with_NITIAL_GUESS_NUM = np.zeros((INITIAL_GUESS_NUM, 1))
 
     # NMPC initial setting
     # x_initial_guess = np.zeros((NUM_STATE, num_loop+1))
@@ -637,30 +590,53 @@ def experiment(
     x_0 = rng0[X0_IDX,IDX_X_INI]
     theta_0 = rng0[X0_IDX,IDX_THETA_INI]
     theta_red_0 = ThetaToRedTheta(theta_0)
-    x0 = np.array([x_0, 0.0, theta_red_0, 0])
-    
+    # x0 = np.array([x_0, 0.0, theta_red_0, 0])
+    # print(f'x0-- {x0}')
+
     for idx_ini_guess in range(0, INITIAL_GUESS_NUM):
-         for i in range(0, num_loop):
-             x_ini_guess = initial_guess_x[idx_ini_guess]
-             u_ini_guess = initial_guess_u[idx_ini_guess]
-             X_sol, U_sol, Cost_sol = MPC_Solve(EulerForwardCartpole_virtual_Casadi, dynamic_update_virtual_Casadi, x0, x_ini_guess, u_ini_guess, NUM_STATE, HORIZON, Q, R, TS, opts_setting)
+        x0 = np.array([x_0, 0.0, theta_0, 0, theta_red_0])
+        print(f'x0-- {x0}')
+        x_nmpc_track[:,idx_ini_guess*(num_loop+1)]  = x0
+        NMPC_total_time = 0
+        x_ini_guess = initial_guess_x[idx_ini_guess]
+        u_ini_guess = initial_guess_u[idx_ini_guess]
+        for i in range(0, num_loop):
+             X_sol, U_sol, Cost_sol, single_MPC_time = MPC_Solve(EulerForwardCartpole_virtual_Casadi, dynamic_update_virtual_Casadi, x0, x_ini_guess, u_ini_guess, NUM_STATE+1, HORIZON, Q, R, TS, opts_setting)
              print(f'X_sol_shape -- {X_sol.shape}')
              print(f'U_sol - {U_sol}') 
+            
+             # applied u
+             applied_u = U_sol[0]
 
-             # select the first updated states as new starting state ans save in the x_track
-             x0 = X_sol[:,1]
-             print(f'x0_new-- {x0}')
+             # x0 next 
+             x0_next = EulerForwardCartpole_virtual(TS,x0,applied_u)
+             x0 = x0_next
+             print(f'x0_next-- {x0}')
+
+             # new starting x and u
+             #x_ini_guess = x0
+
+
              x_nmpc_track[:,idx_ini_guess*(num_loop+1)+(i+1)] = x0
 
-             x_nmpc_horizon_track[i,:,:] = np.round(X_sol.T, decimals=4)
+             # x_nmpc_horizon_track[idx_ini_guess*num_loop+i,:,:] = np.round(X_sol.T, decimals=4)
 
              #save the first computed control input
-             u_nmpc_track[:,i] = U_sol[0]
+             u_nmpc_track[idx_ini_guess,i] = U_sol[0]
             
              # save the computed control inputs along the mpc horizon
-             u_nmpc_horizon_track[i,:] = U_sol
-
-
+             u_nmpc_horizon_track[idx_ini_guess*num_loop+i,:] = U_sol
+             
+             # single solving time
+             NMPC_total_time += single_MPC_time
+        # solving time recording
+        NMPC_total_time_with_NITIAL_GUESS_NUM[idx_ini_guess,0] = NMPC_total_time 
+    
+    # round u data
+    u_nmpc_track = np.round(u_nmpc_track,decimals=4)
+    u_nmpc_horizon_track = np.round(u_nmpc_horizon_track,decimals=4)
+    print(f'u_nmpc_track -- {u_nmpc_track}')
+    print(f'u_nmpc_horizon_track -- {u_nmpc_horizon_track}')
 
 
     # x_0 = rng0[test,0]
@@ -743,57 +719,57 @@ def experiment(
 
     # ##### data collecting loop #####
     # data (x,u) collecting (saved in PT file)
-    SIZE_NORMAL_DATA = INITIAL_GUESS_NUM*num_datagroup*(ITERATIONS)
-    # SIZE_NOISE_DATA = INITIAL_GUESS_NUM*num_datagroup*ITERATIONS_X_NUMNOISY
-    x_normal_shape = (SIZE_NORMAL_DATA,NUM_STATE)
-    u_normal_shape = (SIZE_NORMAL_DATA,HORIZON,1)
+    # SIZE_NORMAL_DATA = INITIAL_GUESS_NUM*num_datagroup*(ITERATIONS)
+    # # SIZE_NOISE_DATA = INITIAL_GUESS_NUM*num_datagroup*ITERATIONS_X_NUMNOISY
+    # x_normal_shape = (SIZE_NORMAL_DATA,NUM_STATE)
+    # u_normal_shape = (SIZE_NORMAL_DATA,HORIZON,1)
     # j_normal_shape = (SIZE_NORMAL_DATA)
     # x_noise_shape = (SIZE_NOISE_DATA,NUM_STATE)
     # u_noise_shape = (SIZE_NOISE_DATA,HORIZON,1)
     # j_noise_shape = (SIZE_NOISE_DATA)
 
-    MAX_CORE_CPU = 30
-    start_time = time.time()
-    with Manager() as manager:
-        x_normal_shared_memory = manager.list([[0.0] * x_normal_shape[1]] * x_normal_shape[0])
-        u_normal_shared_memory = manager.list([[[0.0] for _ in range(u_normal_shape[1])] for _ in range(u_normal_shape[0])])
+    # MAX_CORE_CPU = 30
+    # start_time = time.time()
+    # with Manager() as manager:
+    #     x_normal_shared_memory = manager.list([[0.0] * x_normal_shape[1]] * x_normal_shape[0])
+    #     u_normal_shared_memory = manager.list([[[0.0] for _ in range(u_normal_shape[1])] for _ in range(u_normal_shape[0])])
         # j_normal_shared_memory = manager.list([0.0] * j_normal_shape)
         # x_noise_shared_memory = manager.list([[0.0] * x_noise_shape[1]] * x_noise_shape[0])
         # u_noise_shared_memory = manager.list([[[0.0] for _ in range(u_noise_shape[1])] for _ in range(u_noise_shape[0])])
         # j_noise_shared_memory = manager.list([0.0] * j_noise_shape)
         
-        argument_each_group = []
-        for idx_ini_guess in range(0, INITIAL_GUESS_NUM): 
-            for turn in range(0,num_datagroup):
-                # initial guess
-                x_ini_guess = initial_guess_x[idx_ini_guess]
-                u_ini_guess = initial_guess_u[idx_ini_guess]
-                idx_group_of_control_step = idx_ini_guess*num_datagroup+turn
+        # argument_each_group = []
+        # for idx_ini_guess in range(0, INITIAL_GUESS_NUM): 
+        #     for turn in range(0,num_datagroup):
+        #         # initial guess
+        #         x_ini_guess = initial_guess_x[idx_ini_guess]
+        #         u_ini_guess = initial_guess_u[idx_ini_guess]
+        #         idx_group_of_control_step = idx_ini_guess*num_datagroup+turn
                 
-                #initial states
-                x_0 = rng0[turn,IDX_X_INI]
-                theta_0 = rng0[turn,IDX_THETA_INI]
-                theta_red_0 = ThetaToRedTheta(theta_0)
-                x0 = np.array([x_0, 0.0, theta_red_0, 0]) # theta_red_0 replace theta_0!!!
+        #         #initial states
+        #         x_0 = rng0[turn,IDX_X_INI]
+        #         theta_0 = rng0[turn,IDX_THETA_INI]
+        #         theta_red_0 = ThetaToRedTheta(theta_0)
+        #         x0 = np.array([x_0, 0.0, theta_red_0, 0]) # theta_red_0 replace theta_0!!!
                 
-                argument_each_group.append((x_ini_guess, u_ini_guess, idx_group_of_control_step, x0, 
-                                            x_normal_shared_memory, u_normal_shared_memory)) # , j_normal_shared_memory,x_noise_shared_memory, u_noise_shared_memory, j_noise_shared_memory
+        #         argument_each_group.append((x_ini_guess, u_ini_guess, idx_group_of_control_step, x0, 
+        #                                     x_normal_shared_memory, u_normal_shared_memory)) # , j_normal_shared_memory,x_noise_shared_memory, u_noise_shared_memory, j_noise_shared_memory
    
-        with Pool(processes=MAX_CORE_CPU) as pool:
-            pool.starmap(RunMPCForSingle_IniState_IniGuess, argument_each_group)
+        # with Pool(processes=MAX_CORE_CPU) as pool:
+        #     pool.starmap(RunMPCForSingle_IniState_IniGuess, argument_each_group)
                 
-        # shared memory with manager list
-        x_all_normal = torch.from_numpy(np.array(x_normal_shared_memory))
-        u_all_normal = torch.from_numpy(np.array(u_normal_shared_memory))
+        # # shared memory with manager list
+        # x_all_normal = torch.from_numpy(np.array(x_normal_shared_memory))
+        # u_all_normal = torch.from_numpy(np.array(u_normal_shared_memory))
         # j_all_normal = torch.from_numpy(np.array(j_normal_shared_memory))
         
         # x_all_noisy = torch.from_numpy(np.array(x_noise_shared_memory))
         # u_all_noisy = torch.from_numpy(np.array(u_noise_shared_memory))
         # j_all_noisy = torch.from_numpy(np.array(j_noise_shared_memory))
 
-        # show the first saved u and x0
-        print(f'x_all_normal -- {x_all_normal.size()}')
-        print(f'u_all_normal -- {u_all_normal.size()}')
+        # # show the first saved u and x0
+        # print(f'x_all_normal -- {x_all_normal.size()}')
+        # print(f'u_all_normal -- {u_all_normal.size()}')
 
         # ##### data combing #####
         # # u combine u_normal + u_noisy
@@ -812,16 +788,16 @@ def experiment(
         # torch.save(x0_conditioning_data, os.path.join(SAVE_PATH, X0_CONDITION_DATA_NAME))
         # torch.save(J_training_data, os.path.join(SAVE_PATH, J_DATA_NAME))
 
-    end_time = time.time()
+    # end_time = time.time()
 
-    duration = end_time - start_time
-    print(f"Time taken for generating data: {duration} seconds")
+    # duration = end_time - start_time
+    # print(f"Time taken for generating data: {duration} seconds")
         
-    u_mpc_track = np.round(u_mpc_track,decimals=4)
-    u_mpc_horizon_track = np.round(u_mpc_horizon_track,decimals=4)
+    # u_mpc_track = np.round(u_mpc_track,decimals=4)
+    # u_mpc_horizon_track = np.round(u_mpc_horizon_track,decimals=4)
     
-    print(f'u_mpc_track -- {u_mpc_track}')
-    print(f'u_mpc_horizon_track -- {u_mpc_horizon_track}')
+    # print(f'u_mpc_track -- {u_mpc_track}')
+    # print(f'u_mpc_horizon_track -- {u_mpc_horizon_track}')
 
     ########################## Diffusion & MPC Control Inputs Results Saving ################################
 
@@ -835,7 +811,7 @@ def experiment(
 
     mpc_u = 'u_mpc.npy'
     mpc_u_path = os.path.join(results_folder, mpc_u)
-    np.save(mpc_u_path, u_mpc_track)
+    np.save(mpc_u_path, u_nmpc_track)
 
     # save the u along horizon
     diffusion_u_horizon = 'u_horizon_diffusion.npy'
@@ -844,7 +820,7 @@ def experiment(
 
     mpc_u_horizon = 'u_horizon_mpc.npy'
     mpc_u_horizon_path = os.path.join(results_folder, mpc_u_horizon)
-    np.save(mpc_u_horizon_path, u_mpc_horizon_track)
+    np.save(mpc_u_horizon_path, u_nmpc_horizon_track)
 
     ########################## Diffusion & MPC States Results Saving ################################
     # save diffusion states along horizon
@@ -853,9 +829,9 @@ def experiment(
     np.save(diffusion_states_path, x_horizon_track)
 
     # save mpc states along horizon
-    mpc_states = 'x_mpc_horizon.npy'
-    mpc_states_path = os.path.join(results_folder, mpc_states)
-    np.save(mpc_states_path, x_mpc_horizon_track)
+    # mpc_states = 'x_mpc_horizon.npy'
+    # mpc_states_path = os.path.join(results_folder, mpc_states)
+    # np.save(mpc_states_path, x_nmpc_horizon_track)
 
     ########################## plot ################################
     num_i = num_loop
@@ -866,32 +842,32 @@ def experiment(
 
     plt.subplot(5, 1, 1)
     plt.plot(step, x_track[0, :])
-    plt.plot(step, x_mpc_track[0, :])
+    plt.plot(step, x_nmpc_track[0, :])
     plt.legend(['Diffusion Sampling', 'MPC']) 
     plt.ylabel('Position (m)')
     plt.grid()
 
     plt.subplot(5, 1, 2)
     plt.plot(step, x_track[1, :])
-    plt.plot(step, x_mpc_track[1, :])
+    plt.plot(step, x_nmpc_track[1, :])
     plt.ylabel('Velocity (m/s)')
     plt.grid()
 
     plt.subplot(5, 1, 3)
     plt.plot(step, x_track[2, :])
-    plt.plot(step, x_mpc_track[2, :])
+    plt.plot(step, x_nmpc_track[2, :])
     plt.ylabel('Angle (rad)')
     plt.grid()
 
     plt.subplot(5, 1, 4)
     plt.plot(step, x_track[3, :])
-    plt.plot(step, x_mpc_track[3, :])
+    plt.plot(step, x_nmpc_track[3, :])
     plt.ylabel('Ag Velocity (rad/s)')
     plt.grid()
 
     plt.subplot(5, 1, 5)
     plt.plot(step_u, u_track.reshape(num_loop,))
-    plt.plot(step_u, u_mpc_track.reshape(num_loop,))
+    plt.plot(step_u, u_nmpc_track.reshape(num_loop,))
     plt.ylabel('Ctl Input (N)')
     plt.xlabel('Control Step')
     plt.grid()
@@ -902,25 +878,25 @@ def experiment(
     plt.savefig(figure_path)
 
     ######### Performance Check #########
-    position_difference = np.sum(np.abs(x_track[0, :] - x_mpc_track[0, :]))
+    position_difference = np.sum(np.abs(x_track[0, :] - x_nmpc_track[0, :]))
     print(f'position_difference - {position_difference}')
 
-    velocity_difference = np.sum(np.abs(x_track[1, :] - x_mpc_track[1, :]))
+    velocity_difference = np.sum(np.abs(x_track[1, :] - x_nmpc_track[1, :]))
     print(f'velocity_difference - {velocity_difference}')
 
-    theta_difference = np.sum(np.abs(x_track[2, :] - x_mpc_track[2, :]))
+    theta_difference = np.sum(np.abs(x_track[2, :] - x_nmpc_track[2, :]))
     print(f'theta_difference - {theta_difference}')
 
-    thetaVel_difference = np.sum(np.abs(x_track[3, :] - x_mpc_track[3, :]))
+    thetaVel_difference = np.sum(np.abs(x_track[3, :] - x_nmpc_track[3, :]))
     print(f'thetaVel_difference - {thetaVel_difference}')
 
-    u_difference = np.sum(np.abs(u_track.reshape(num_loop,) - u_mpc_track.reshape(num_loop,)))
+    u_difference = np.sum(np.abs(u_track.reshape(num_loop,) - u_nmpc_track.reshape(num_loop,)))
     print(f'u_difference - {u_difference}')
 
     print(f'initial_state -- {initial_state}')
 
     print(f'NN_total_time -- {NN_total_time}')
-    print(f'MPC_total_time -- {MPC_total_time}')
+    print(f'NMPC_total_time_with_NITIAL_GUESS_NUM -- {NMPC_total_time_with_NITIAL_GUESS_NUM}')
 
 
 
