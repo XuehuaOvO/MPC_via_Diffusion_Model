@@ -27,18 +27,18 @@ allow_ops_in_compiled_graph()
 
 
 TRAINED_MODELS_DIR = '../../nn_trained_models/' # '../../trained_models/' cart_pole_diffusion_based_on_MPD/nn_trained_models/nmpc_672000_training_data
-MODEL_FOLDER = 'nmpc_672000_training_data' # choose a main model folder saved in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
-MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nmpc_672000_training_data/300000' # the absolute path of the trained model
-MODEL_ID = '300000' # number of training
+MODEL_FOLDER = 'nmpc_672000_training_data_DIM_5' # choose a main model folder saved in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
+MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nmpc_672000_training_data_DIM_5/final' # the absolute path of the trained model
+MODEL_ID = 'final' # number of training
 
-POSITION_INITIAL_RANGE = np.linspace(-0.5, 0.5,10) # np.linspace(-1,1,5)
-THETA_INITIAL_RANGE = np.linspace(3*np.pi/4, 5*np.pi/4, 20) # np.linspace(-np.pi/4,np.pi/4,5)
+POSITION_INITIAL_RANGE = np.linspace(-0.5, 0.5,5) # np.linspace(-1,1,5)
+THETA_INITIAL_RANGE = np.linspace(3*np.pi/4, 5*np.pi/4, 5) # np.linspace(-np.pi/4,np.pi/4,5)
 WEIGHT_GUIDANC = 0.01 # non-conditioning weight
-X0_IDX = 50 # range:[0,199] 20*20 data 
+X0_IDX = 18 # range:[0,199] 20*20 data 0
 ITERATIONS = 80 # control loop (steps) 50
 HORIZON = 64 # mpc horizon 8
 
-RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/nn_nmpc_672000/300000'
+RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/nn_nmpc_672000/final'
 
 class AMPCNet_Inference(nn.Module):
     def __init__(self, input_size, output_size):
@@ -202,7 +202,7 @@ def ThetaToRedTheta(theta):
 opts_setting = {'ipopt.max_iter':20000, 'ipopt.acceptable_tol':1e-8, 'ipopt.acceptable_obj_change_tol':1e-6, 'ipopt.print_level': 0, 'print_time': 0, 'ipopt.sb': 'yes'}
 
 # NMPC
-NUM_STATE = 4
+NUM_STATE = 5
 Q_REDUNDANT = 1000.0
 P_REDUNDANT = 1000.0
 Q = np.diag([0.01, 0.01, 0, 0.01, Q_REDUNDANT]) #Q = np.diag([0.01, 0.01, Q_REDUNDANT, 0.01])
@@ -385,7 +385,7 @@ def experiment(
     x_0 = rng0[X0_IDX,IDX_X_INI]
     theta_0 = rng0[X0_IDX,IDX_THETA_INI]
     theta_red_0 = ThetaToRedTheta(theta_0)
-    x0 = np.array([x_0, 0.0, theta_red_0, 0]) # theta_red replace theta!!!
+    x0 = np.array([x_0, 0.0, theta_0, 0, theta_red_0]) # theta_red replace theta!!!
 
 
     #initial context
@@ -508,13 +508,13 @@ def experiment(
         x0_horizon = np.squeeze(x0.numpy())
         for z in range(0,horizon_inputs.shape[1]):
             #x_horizon_update = cart_pole_dynamics(x0_horizon, horizon_inputs[0,z])
-            x_horizon_update = EulerForwardCartpole_virtual_4DoF(TS,x0_horizon,horizon_inputs[0,z])
+            x_horizon_update = EulerForwardCartpole_virtual(TS,x0_horizon,horizon_inputs[0,z])
             x_updated_by_u[z+1,:] = x_horizon_update.T
             x0_horizon = x_horizon_update
         x_horizon_track[i,:,:] = np.round(x_updated_by_u, decimals=4)
 
         # update cart pole state
-        x_next = EulerForwardCartpole_virtual_4DoF(TS,x0_array,applied_input) # cart_pole_dynamics(x0_array, applied_input)
+        x_next = EulerForwardCartpole_virtual(TS,x0_array,applied_input) # cart_pole_dynamics(x0_array, applied_input)
         print(f'x_next-- {x_next}')
         x0 = np.array(x_next)
         x0 = x0.T # transpose matrix
@@ -522,12 +522,12 @@ def experiment(
         # save the new state
         x_track[:,i+1] = x0
 
-        x_updated_by_u = np.zeros((HORIZON+1, 4))
+        # x_updated_by_u = np.zeros((HORIZON+1, 4))
         x_updated_by_u[0,:] = x0
 
         # save new starting state along the horizon
-        x_updated_by_u = np.zeros((HORIZON+1, 4))
-        x_updated_by_u[0,:] = x0
+        # x_updated_by_u = np.zeros((HORIZON+1, 4))
+        #x_updated_by_u[0,:] = x0
 
 
 
@@ -569,7 +569,7 @@ def experiment(
     # ##### data collecting loop #####
 
     # data set for each turn
-    x_nmpc_track = np.zeros((NUM_STATE+1, INITIAL_GUESS_NUM*(num_loop+1))) # 4,2*(80+1)
+    x_nmpc_track = np.zeros((NUM_STATE, INITIAL_GUESS_NUM*(num_loop+1))) # 4,2*(80+1)
     u_nmpc_track = np.zeros((INITIAL_GUESS_NUM, num_loop)) # 2,80
     u_nmpc_horizon_track = np.zeros((INITIAL_GUESS_NUM*num_loop, HORIZON)) # 2*80,64
 
@@ -601,7 +601,7 @@ def experiment(
         x_ini_guess = initial_guess_x[idx_ini_guess]
         u_ini_guess = initial_guess_u[idx_ini_guess]
         for i in range(0, num_loop):
-             X_sol, U_sol, Cost_sol, single_MPC_time = MPC_Solve(EulerForwardCartpole_virtual_Casadi, dynamic_update_virtual_Casadi, x0, x_ini_guess, u_ini_guess, NUM_STATE+1, HORIZON, Q, R, TS, opts_setting)
+             X_sol, U_sol, Cost_sol, single_MPC_time = MPC_Solve(EulerForwardCartpole_virtual_Casadi, dynamic_update_virtual_Casadi, x0, x_ini_guess, u_ini_guess, NUM_STATE, HORIZON, Q, R, TS, opts_setting)
              print(f'X_sol_shape -- {X_sol.shape}')
              print(f'U_sol - {U_sol}') 
             
