@@ -14,14 +14,17 @@ from collections import defaultdict
 # from experiment_launcher import single_experiment_yaml, run_experiment
 # from mpd import trainer
 # from mpd.models import UNET_DIM_MULTS, ConditionedTemporalUnet
-from mpd.trainer import get_dataset # , get_model, get_loss, get_summary
+from mpd.trainer import get_specified_dataset, get_dataset # , get_model, get_loss, get_summary
 # from mpd.trainer.trainer import get_num_epochs
 from torch_robotics.torch_utils.seed import fix_random_seed
 from torch_robotics.torch_utils.torch_utils import get_torch_device
 
 ########## Setting ############
+STATE_DIM = 5
 BATCH_SIZE = 512
-MODEL_SAVED_DIRECTORY = 'logs/nn_180000' # under the train_diffusion folder
+HORIZON = 64
+MODEL_SAVED_DIRECTORY = 'logs/nn_672000_DIM_5' # under the train_diffusion folder
+EXTRA_MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nmpc_672000_specified_train_validation'
 
 
 
@@ -108,7 +111,7 @@ class AMPCNet(nn.Module):
         self.hidden3 = nn.Linear(50, 50)         # Third hidden layer with 50 neurons
         self.output = nn.Linear(50, output_size) # Output layer
 
-    def forward(self, x, batch_size):
+    def forward(self, x, batch_size, horizon):
         # Forward pass through the network with the specified activations
         x = torch.tanh(self.hidden1(x))          # Tanh activation for first hidden layer
         x = torch.tanh(self.hidden2(x))          # Tanh activation for second hidden layer
@@ -116,14 +119,14 @@ class AMPCNet(nn.Module):
         x = self.output(x)                       # Linear activation (no activation function) for the output layer
 
         # reshape the output
-        x = x.view(batch_size, 8, 1) # 512(batch size)*8*1
+        x = x.view(batch_size, horizon, 1) # 512(batch size)*8*1
 
         return x
     
 
 # model input & output size
-input_size = 4    # Define your input size based on your problem
-output_size = 8    # Define your output size based on your problem (e.g., regression or single class prediction)
+input_size = STATE_DIM    # Define your input size based on your problem
+output_size = HORIZON    # Define your output size based on your problem (e.g., regression or single class prediction)
 model = AMPCNet(input_size, output_size)
 
 
@@ -145,7 +148,7 @@ use_ema = True
 use_amp = False
 
 # model saving address
-model_saving_address =  '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/180000_training_data'
+model_saving_address =  EXTRA_MODEL_PATH
 
 # Summary parameters
 steps_til_summary = 2000
@@ -187,7 +190,7 @@ model = model.to(device)
 
 # Dataset
 
-train_subset, train_dataloader, val_subset, val_dataloader = get_dataset(
+train_subset, train_dataloader, val_subset, val_dataloader = get_specified_dataset(
     dataset_class='InputsDataset',
     include_velocity=include_velocity,
     dataset_subdir=dataset_subdir,
@@ -280,7 +283,7 @@ with tqdm(total=(len(train_dataloader)-1) * epochs, mininterval=1 if debug else 
                 # print(f'targets size -- {targets.size()}')
 
                 # Forward pass: Get predictions from the model
-                outputs = model(inputs,batch_size)
+                outputs = model(inputs,batch_size,horizon = HORIZON)
 
                 # Compute the loss
                 loss = criterion(outputs, targets)
@@ -336,7 +339,7 @@ with tqdm(total=(len(train_dataloader)-1) * epochs, mininterval=1 if debug else 
                             # print(f'targets_val size -- {targets_val.size()}')
 
                             # Forward pass: Get predictions from the model
-                            outputs_val = model(inputs_val,batch_size = batch_size)
+                            outputs_val = model(inputs_val,batch_size, horizon = HORIZON)
 
                             # Compute the loss
                             loss_val = criterion(outputs_val, targets_val)
@@ -432,7 +435,7 @@ with tqdm(total=(len(train_dataloader)-1) * epochs, mininterval=1 if debug else 
                 middle_model_dir = os.path.join(saved_main_folder, str(train_steps_current))
                 # os.makedirs(middle_model_dir, exist_ok=True)
                 print(f'model dir path -- {middle_model_dir}')
-                shutil.copytree(model_dir, middle_model_dir)
+                shutil.copytree(model_dir, middle_model_dir, dirs_exist_ok=True)
                 print(f'New model {train_steps_current} has been saved !!!')
 
             if stop_training or (max_steps is not None and train_steps_current == max_steps):
@@ -453,6 +456,9 @@ with tqdm(total=(len(train_dataloader)-1) * epochs, mininterval=1 if debug else 
     save_nn_models_to_disk([(model, 'model'), (ema_model, 'ema_model')],
                         epoch, train_steps_current, checkpoints_dir)
     save_losses_to_disk(train_losses_l, validation_losses_l, checkpoints_dir)
+    final_model_dir = os.path.join(saved_main_folder, 'final')
+    shutil.copytree(model_dir, final_model_dir)
+    print(f'Final model has been saved !!!')
 
     print(f'\n------- TRAINING FINISHED -------')
 
