@@ -1,7 +1,7 @@
 import os
 
 import torch
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, Subset, random_split
 
 from mpd import models, losses, datasets, summaries
 from mpd.utils import model_loader, pretrain_helper
@@ -74,6 +74,44 @@ def get_loss(loss_class=None, **kwargs):
     return loss_fn
 
 
+def get_specified_dataset(dataset_class=None,
+                dataset_subdir=None,
+                batch_size=2,
+                val_set_size=0.05,
+                results_dir=None,
+                save_indices=False,
+                **kwargs):
+    DatasetClass = getattr(datasets, dataset_class)
+    print('\n---------------Loading data')
+    full_dataset = DatasetClass(dataset_subdir=dataset_subdir, **kwargs)
+    indices_normal_pos = list(range(0,16000))
+    pos_normal_data = Subset(full_dataset, indices_normal_pos)
+    print(f"pos_normal_data -- {pos_normal_data}")
+    indices_normal_neg = list(range(16000,32000))
+    neg_normal_data = Subset(full_dataset, indices_normal_neg)
+    indices_noisy_pos = list(range(32000,352000))
+    neg_normal_data = Subset(full_dataset, indices_noisy_pos)
+    indices_noisy_neg = list(range(352000,672000))
+    neg_normal_data = Subset(full_dataset, indices_noisy_neg)
+    # print(f"full_subset_inp_nor -- {full_dataset['inputs_normalized']}")
+    # print(f'batch_size-- {batch_size}')
+
+    # split into train and validation
+    train_subset, val_subset = random_split(full_dataset, [1-val_set_size, val_set_size])
+    print(f'train_subset -- {train_subset}')
+    train_dataloader = DataLoader(train_subset, batch_size=batch_size)
+    print(f'train_dataloader -- {len(train_dataloader)}')
+    val_dataloader = DataLoader(val_subset, batch_size=batch_size)
+    print(f'val_dataloader -- {len(val_dataloader)}')
+
+    if save_indices:
+        # save the indices of training and validation sets (for later evaluation)
+        torch.save(train_subset.indices, os.path.join(results_dir, f'train_subset_indices.pt'))
+        torch.save(val_subset.indices, os.path.join(results_dir, f'val_subset_indices.pt'))
+
+    return train_subset, train_dataloader, val_subset, val_dataloader
+
+
 def get_dataset(dataset_class=None,
                 dataset_subdir=None,
                 batch_size=2,
@@ -85,7 +123,7 @@ def get_dataset(dataset_class=None,
     print('\n---------------Loading data')
     full_dataset = DatasetClass(dataset_subdir=dataset_subdir, **kwargs)
     print(f'full_subset -- {full_dataset}')
-    print(f'batch_size-- {batch_size}')
+    # print(f'batch_size-- {batch_size}')
 
     # split into train and validation
     train_subset, val_subset = random_split(full_dataset, [1-val_set_size, val_set_size])
