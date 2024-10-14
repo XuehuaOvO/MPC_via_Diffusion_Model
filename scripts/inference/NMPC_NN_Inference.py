@@ -271,6 +271,16 @@ def MPC_Solve( system_update, system_dynamic, x0:np.array, initial_guess_x:float
 
 # MPC_NormalData_Process
 
+def Cost_calculating(x:float, u:float, Q_cost:np.array, R_cost:float):
+    # cost 
+    cost = 0
+
+    #state cost
+    for k in range(0,len(x)-1):
+        cost += Q_cost[0,0]*x[0, k+1]**2 + Q_cost[1,1]*x[1, k+1]**2 + Q_cost[2,2]*x[2, k+1]**2 + Q_cost[3,3]*x[3, k+1]**2 + Q_cost[4,4]*x[4, k+1]**2 + R_cost * u[:, k]**2
+
+
+
 
 # EulerForwardCartpole_virtual
 def EulerForwardCartpole_virtual(dt, x,u) -> ca.vertcat:
