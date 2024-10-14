@@ -12,7 +12,7 @@ from einops._torch_specific import allow_ops_in_compiled_graph  # requires einop
 from experiment_launcher import single_experiment_yaml, run_experiment
 from mpd.models import ConditionedTemporalUnet, UNET_DIM_MULTS
 from mpd.models.diffusion_models.sample_functions import guide_gradient_steps, ddpm_sample_fn, ddpm_cart_pole_sample_fn
-from mpd.trainer import get_dataset, get_model
+from mpd.trainer import get_dataset, get_model,get_specified_dataset
 from mpd.utils.loading import load_params_from_yaml
 from torch_robotics.torch_utils.seed import fix_random_seed
 from torch_robotics.torch_utils.torch_timer import TimerCUDA
@@ -27,18 +27,18 @@ allow_ops_in_compiled_graph()
 
 
 TRAINED_MODELS_DIR = '../../nn_trained_models/' # '../../trained_models/' cart_pole_diffusion_based_on_MPD/nn_trained_models/nmpc_672000_training_data
-MODEL_FOLDER = 'nmpc_672000_training_data' # choose a main model folder saved in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
-MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nmpc_672000_training_data/100000' # the absolute path of the trained model
-MODEL_ID = '100000' # number of training
+MODEL_FOLDER = 'nmpc_672000_loader_zip' # choose a main model folder saved in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
+MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nmpc_672000_loader_zip/final' # the absolute path of the trained model
+MODEL_ID = 'final' # number of training
 
 POSITION_INITIAL_RANGE = np.linspace(-0.5, 0.5,5) # np.linspace(-1,1,5)
 THETA_INITIAL_RANGE = np.linspace(3*np.pi/4, 5*np.pi/4, 5) # np.linspace(-np.pi/4,np.pi/4,5)
 WEIGHT_GUIDANC = 0.01 # non-conditioning weight
-X0_IDX = 3 # range:[0,199] 20*20 data 0
+X0_IDX = 10 # range:[0,199] 20*20 data 0
 ITERATIONS = 80 # control loop (steps) 50
 HORIZON = 64 # mpc horizon 8
 
-RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/nn_nmpc_672000/300000'
+RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/nn_nmpc_672000/final'
 
 class AMPCNet_Inference(nn.Module):
     def __init__(self, input_size, output_size):
@@ -350,7 +350,7 @@ def experiment(
 
     #################################################################
     # Load dataset
-    train_subset, train_dataloader, val_subset, val_dataloader = get_dataset(
+    train_subset, train_dataloader, val_subset, val_dataloader = get_specified_dataset(
         dataset_class='InputsDataset',
         dataset_subdir = 'CartPole-LMPC',
         tensor_args=tensor_args
@@ -385,7 +385,7 @@ def experiment(
     x_0 = rng0[X0_IDX,IDX_X_INI]
     theta_0 = rng0[X0_IDX,IDX_THETA_INI]
     theta_red_0 = ThetaToRedTheta(theta_0)
-    x0 = np.array([0.5, 0.0, 3.1415926, 0, 3.1415926]) # x0 = np.array([x_0, 0.0, theta_0, 0, theta_red_0])  np.array([0.5, 0.0, 3.1415926, 0, 3.1415926])
+    x0 = np.array([x_0, 0.0, theta_0, 0, theta_red_0]) # x0 = np.array([x_0, 0.0, theta_0, 0, theta_red_0])  np.array([0.5, 0.0, 3.1415926, 0, 3.1415926])
     print(f'x0  -- {x0}')
 
 
@@ -603,7 +603,7 @@ def experiment(
     # print(f'x0-- {x0}')
 
     for idx_ini_guess in range(0, INITIAL_GUESS_NUM):
-        x0 = np.array([0.5, 0.0, 3.1415926, 0, 3.1415926])  # x0 = np.array([x_0, 0.0, theta_0, 0, theta_red_0])  np.array([0.5, 0.0, 3.1415926, 0, 3.1415926])
+        x0 = np.array([x_0, 0.0, theta_0, 0, theta_red_0])  # x0 = np.array([x_0, 0.0, theta_0, 0, theta_red_0])  np.array([0.5, 0.0, 3.1415926, 0, 3.1415926])
         print(f'x0-- {x0}')
         x_nmpc_track[:,idx_ini_guess*(num_loop+1)]  = x0
         NMPC_total_time = 0
