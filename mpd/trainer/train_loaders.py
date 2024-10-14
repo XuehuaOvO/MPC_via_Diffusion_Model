@@ -91,52 +91,52 @@ def get_loss(loss_class=None, **kwargs):
 
 # Custom batch sampler
 # Custom BatchSampler to achieve the desired batching
-class CustomConcatBatchSampler(BatchSampler):
-    def __init__(self, idx1, idx2, idx3, idx4, n1, n2, n3, n4, batch_size):
-        self.n1 = n1  
-        self.n2 = n2
-        self.n3 = n3
-        self.n4 = n4
-        self.idx1 = idx1
-        self.idx2 = idx2
-        self.idx3 = idx3
-        self.idx4 = idx4
-        self.batch_size = batch_size
+# class CustomConcatBatchSampler(BatchSampler):
+#     def __init__(self, idx1, idx2, idx3, idx4, n1, n2, n3, n4, batch_size):
+#         self.n1 = n1  
+#         self.n2 = n2
+#         self.n3 = n3
+#         self.n4 = n4
+#         self.idx1 = idx1
+#         self.idx2 = idx2
+#         self.idx3 = idx3
+#         self.idx4 = idx4
+#         self.batch_size = batch_size
 
-    def __iter__(self):
-        # Iterate through the dataset indices
-        # n1: size of dataset1 and dataset2
-        # n2: size of dataset3 and dataset4
-        i1 = 0 # = 0
-        i2 = 0 # = 16000  
-        i3 = 0 # = 32000
-        i4 = 0 # = 352000
+#     def __iter__(self):
+#         # Iterate through the dataset indices
+#         # n1: size of dataset1 and dataset2
+#         # n2: size of dataset3 and dataset4
+#         i1 = 0 # = 0
+#         i2 = 0 # = 16000  
+#         i3 = 0 # = 32000
+#         i4 = 0 # = 352000
 
-        while self.idx1 + i1 < self.idx1 + np.floor((self.n1-self.idx1)/(self.batch_size// 2))*(self.batch_size// 2):
-            # print(f'self.idx2--{self.idx2}')
-            # if self.idx1 + i1 < self.idx1 + np.floor((self.n1-self.idx1)/(self.batch_size// 2))*(self.batch_size// 2):
-            batch1 = list(range(self.idx1+i1, min(self.idx1 + i1 + self.batch_size // 2, self.n1)))
-            # print(f'batch1 -- {batch1}')
-            batch2 = list(range(self.idx2+i2,  min(self.idx2 + i2 + self.batch_size // 2, self.n2)))
-            # print(f'batch2 -- {batch2}')
-            yield batch1 + batch2
-            i1 += self.batch_size // 2
-            i2 += self.batch_size // 2
-            # if idx1 >= np.floor(self.n1/self.batch_size)*self.batch_size:
-            #     break
+#         while self.idx1 + i1 < self.idx1 + np.floor((self.n1-self.idx1)/(self.batch_size// 2))*(self.batch_size// 2):
+#             # print(f'self.idx2--{self.idx2}')
+#             # if self.idx1 + i1 < self.idx1 + np.floor((self.n1-self.idx1)/(self.batch_size// 2))*(self.batch_size// 2):
+#             batch1 = list(range(self.idx1+i1, min(self.idx1 + i1 + self.batch_size // 2, self.n1)))
+#             # print(f'batch1 -- {batch1}')
+#             batch2 = list(range(self.idx2+i2,  min(self.idx2 + i2 + self.batch_size // 2, self.n2)))
+#             # print(f'batch2 -- {batch2}')
+#             yield batch1 + batch2
+#             i1 += self.batch_size // 2
+#             i2 += self.batch_size // 2
+#             # if idx1 >= np.floor(self.n1/self.batch_size)*self.batch_size:
+#             #     break
 
-        while self.idx3 + i3 < self.idx3 + np.floor((self.n3-self.idx3)/(self.batch_size// 2))*(self.batch_size// 2):
-            # if self.idx3 + i3 < self.idx3 + np.floor((self.n3-self.idx3)/(self.batch_size// 2))*(self.batch_size// 2):
-            batch3 = list(range(self.idx3+i3,  min(self.idx3 + i3 + self.batch_size // 2, self.n3)))
-            batch4 = list(range(self.idx4+i4,  min(self.idx4 + i4 + self.batch_size // 2, self.n4)))
-            yield batch3 + batch4
-            i3 += self.batch_size // 2
-            i4 += self.batch_size // 2
-            # if idx2 >= np.floor(self.n2/self.batch_size)*self.batch_size:
-            #     break
+#         while self.idx3 + i3 < self.idx3 + np.floor((self.n3-self.idx3)/(self.batch_size// 2))*(self.batch_size// 2):
+#             # if self.idx3 + i3 < self.idx3 + np.floor((self.n3-self.idx3)/(self.batch_size// 2))*(self.batch_size// 2):
+#             batch3 = list(range(self.idx3+i3,  min(self.idx3 + i3 + self.batch_size // 2, self.n3)))
+#             batch4 = list(range(self.idx4+i4,  min(self.idx4 + i4 + self.batch_size // 2, self.n4)))
+#             yield batch3 + batch4
+#             i3 += self.batch_size // 2
+#             i4 += self.batch_size // 2
+#             # if idx2 >= np.floor(self.n2/self.batch_size)*self.batch_size:
+#             #     break
 
-    def __len__(self):
-        return (self.n1 - self.idx1) + (self.n2 - self.idx2) + (self.n3 - self.idx3) + (self.n4 - self.idx4) // (self.batch_size)
+#     def __len__(self):
+#         return (self.n1 - self.idx1) + (self.n2 - self.idx2) + (self.n3 - self.idx3) + (self.n4 - self.idx4) // (self.batch_size)
 
 def get_specified_dataset(dataset_class=None,
                 dataset_subdir=None,
@@ -144,98 +144,60 @@ def get_specified_dataset(dataset_class=None,
                 val_set_size=0.05,
                 results_dir=None,
                 save_indices=False,
+                normal_pos_range = None,
+                normal_neg_range = None,
+                noisy_pos_range = None,
+                noisy_neg_range = None,
                 **kwargs):
     DatasetClass = getattr(datasets, dataset_class)
     print('\n---------------Loading data')
     full_dataset = DatasetClass(dataset_subdir=dataset_subdir, **kwargs)
     # data split
-    indices_normal_pos = list(range(0,16000))
-    pos_normal_data = Subset(full_dataset, indices_normal_pos)
-    print(f"pos_normal_data -- {pos_normal_data}")
-    indices_normal_neg = list(range(16000,32000))
-    neg_normal_data = Subset(full_dataset, indices_normal_neg)
-    indices_noisy_pos = list(range(32000,352000))
-    pos_noisy_data = Subset(full_dataset, indices_noisy_pos)
-    indices_noisy_neg = list(range(352000,672000))
-    neg_noisy_data = Subset(full_dataset, indices_noisy_neg)
+    indices_normal_pos = list(normal_pos_range)
+    indices_normal_neg = list(normal_neg_range)
+    indices_noisy_pos = list(noisy_pos_range)
+    indices_noisy_neg = list(noisy_neg_range)
 
     # train and validation subset
-    tran_pos_normal_data_len = tran_neg_normal_data_len  = int((1-val_set_size)*len(pos_normal_data))
+    tran_pos_normal_data_len = tran_neg_normal_data_len  = int((1-val_set_size)*len(indices_normal_pos))
 
-    tran_pos_normal_data_indicies = indices_normal_pos[:tran_pos_normal_data_len]
-    vali_pos_normal_data_indicies = indices_normal_pos[tran_pos_normal_data_len:]
-    tran_pos_normal_data = Subset(full_dataset, tran_pos_normal_data_indicies)
-    vali_pos_normal_data = Subset(full_dataset, vali_pos_normal_data_indicies)
+    tran_pos_normal_data_indicies = indices_normal_pos[:tran_pos_normal_data_len]  # pos normal 0,1,... (15200)
+    vali_pos_normal_data_indicies = indices_normal_pos[tran_pos_normal_data_len:]  # val: pos normal 15200, 15201,... (800)
 
-    tran_neg_normal_data_indicies = indices_normal_neg[:tran_neg_normal_data_len]
-    vali_neg_normal_data_indicies = indices_normal_neg[tran_neg_normal_data_len:]
-    tran_neg_normal_data = Subset(full_dataset, tran_neg_normal_data_indicies)
-    vali_neg_normal_data = Subset(full_dataset, vali_neg_normal_data_indicies)
+    tran_neg_normal_data_indicies = indices_normal_neg[:tran_neg_normal_data_len]  # neg normal 16000,16001,... (15200)
+    vali_neg_normal_data_indicies = indices_normal_neg[tran_neg_normal_data_len:]  # val: neg normal 31200, 31201,... (800)
 
-    tran_pos_noisy_data_len = tran_neg_noisy_data_len  = int((1-val_set_size)*len(pos_noisy_data))
+    tran_pos_noisy_data_len = tran_neg_noisy_data_len  = int((1-val_set_size)*len(indices_noisy_pos))
 
-    tran_pos_noisy_data_indicies = indices_noisy_pos[:tran_pos_noisy_data_len]
-    vali_pos_noisy_data_indicies = indices_noisy_pos[tran_pos_noisy_data_len:]
-    tran_pos_noisy_data = Subset(full_dataset, tran_pos_noisy_data_indicies)
-    vali_pos_noisy_data = Subset(full_dataset, vali_pos_noisy_data_indicies)
+    tran_pos_noisy_data_indicies = indices_noisy_pos[:tran_pos_noisy_data_len]  # pos noisy 32000, 32001, ... (304000)
+    vali_pos_noisy_data_indicies = indices_noisy_pos[tran_pos_noisy_data_len:]  # val: pos noisy 336000, 336001,... (16000)
 
-    tran_neg_noisy_data_indicies = indices_noisy_neg[:tran_neg_noisy_data_len]
-    vali_neg_noisy_data_indicies = indices_noisy_neg[tran_neg_noisy_data_len:]
-    tran_neg_noisy_data = Subset(full_dataset, tran_neg_noisy_data_indicies)
-    vali_neg_noisy_data = Subset(full_dataset, vali_neg_noisy_data_indicies)
+    tran_neg_noisy_data_indicies = indices_noisy_neg[:tran_neg_noisy_data_len]  # neg noisy 352000, 352001, ... (304000)
+    vali_neg_noisy_data_indicies = indices_noisy_neg[tran_neg_noisy_data_len:]  # val: neg noisy 656000, 656001,... (16000)
 
-    # train_normal_combined_dataset = CombinedDataset(tran_pos_normal_data, tran_neg_normal_data)
-    # print(f'len(train_normal_combined_dataset) -- {len(train_normal_combined_dataset)}')
-    # train_noisy_combined_dataset = CombinedDataset(tran_pos_noisy_data, tran_neg_noisy_data)
-    # print(f'len(train_noisy_combined_dataset) -- {len(train_noisy_combined_dataset)}')
+    # Interleave the two lists (train and validation)
+    train_normal_combined_indices = [val for pair in zip(tran_pos_normal_data_indicies, tran_neg_normal_data_indicies) for val in pair]
+    train_noisy_combined_indices = [val for pair in zip(tran_pos_noisy_data_indicies, tran_neg_noisy_data_indicies) for val in pair]
+    train_indices = train_normal_combined_indices + train_noisy_combined_indices
 
-    # val_normal_combined_dataset = CombinedDataset(vali_pos_normal_data, vali_neg_normal_data)
-    # print(f'len(val_normal_combined_dataset) -- {len(val_normal_combined_dataset)}')
-    # val_noisy_combined_dataset = CombinedDataset(vali_pos_noisy_data, vali_neg_noisy_data)
-    # print(f'len(val_noisy_combined_dataset) -- {len(val_noisy_combined_dataset)}')
+    val_normal_combined_indices = [val for pair in zip(vali_pos_normal_data_indicies, vali_neg_normal_data_indicies) for val in pair]
+    val_noisy_combined_indices = [val for pair in zip(vali_pos_noisy_data_indicies, vali_neg_noisy_data_indicies) for val in pair]
+    validation_indices = val_normal_combined_indices + val_noisy_combined_indices
 
-    train_subset = ConcatDataset([tran_pos_normal_data, tran_neg_normal_data,tran_pos_noisy_data, tran_neg_noisy_data])
-    print(f'len(train_subset) -- {len(train_subset)}')
-    val_subset = ConcatDataset([vali_pos_normal_data, vali_neg_normal_data,vali_pos_noisy_data, vali_neg_noisy_data])
-    print(f'len(val_subset) -- {len(val_subset)}')
-    
-    # custom_sampler
-    training_batch_size = 512
-    train_custom_sampler = CustomConcatBatchSampler(idx1 = 0, idx2= 16000, idx3= 32000, idx4= 352000, n1=15200, n2= 31200, n3= 336000, n4=656000, batch_size=training_batch_size)
-    # print(f'train_custom_sampler -- {len(train_custom_sampler)}')
-    batch_count = 0
-    for batch_indices in train_custom_sampler:
-        # print(batch_indices)
-        batch_count += 1
-        # print('\n---------------')
-    print(f"train number of batches: {batch_count}")
-    val_custom_sampler = CustomConcatBatchSampler(idx1 = 15200, idx2= 31200, idx3= 336000, idx4= 656000, n1=16000, n2= 32000, n3= 352000, n4=672000, batch_size=training_batch_size)
-    batch_count = 0
-    for batch_indices in val_custom_sampler:
-        # print(batch_indices)
-        batch_count += 1
-        # print('\n---------------')
-    print(f"val number of batches: {batch_count}")
-    # print(f"full_subset_inp_nor -- {full_dataset['inputs_normalized']}")
-    # print(f'batch_size-- {batch_size}')
+    # train subset and validation subset
+    train_subset = Subset(full_dataset, train_indices)
+    val_subset = Subset(full_dataset, validation_indices)
 
-    # split into train and validation
-    # train_subset, val_subset = random_split(full_dataset, [1-val_set_size, val_set_size])
-    # print(f'train_subset -- {train_subset}')
-    train_dataloader = DataLoader(train_subset, batch_sampler=train_custom_sampler)
+    train_dataloader = DataLoader(train_subset, batch_size=batch_size, shuffle=False)
     print(f'train_dataloader -- {len(train_dataloader)}')
-    # for i, batch in enumerate(train_dataloader):
-    #     tensor1, tensor2 = batch 
-    #     print(f'type(tensor1) --{type(tensor1)}')
-    #     print(f"Batch {i + 1}, first value of tensor1: {tensor1}")
-    #     print(f"Batch {i + 1}, first value of tensor1: {tensor2}")
-    val_dataloader = DataLoader(val_subset, batch_sampler= val_custom_sampler)
+
+    val_dataloader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
     print(f'val_dataloader -- {len(val_dataloader)}')
 
-    # if save_indices:
-    #     # save the indices of training and validation sets (for later evaluation)
-    #     torch.save(train_subset.indices, os.path.join(results_dir, f'train_subset_indices.pt'))
-    #     torch.save(val_subset.indices, os.path.join(results_dir, f'val_subset_indices.pt'))
+    if save_indices:
+        # save the indices of training and validation sets (for later evaluation)
+        torch.save(train_subset.indices, os.path.join(results_dir, f'train_subset_indices.pt'))
+        torch.save(val_subset.indices, os.path.join(results_dir, f'val_subset_indices.pt'))
 
     return train_subset, train_dataloader, val_subset, val_dataloader
 
