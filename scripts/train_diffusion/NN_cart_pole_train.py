@@ -20,12 +20,17 @@ from torch_robotics.torch_utils.seed import fix_random_seed
 from torch_robotics.torch_utils.torch_utils import get_torch_device
 
 ########## Setting ############
-STATE_DIM = 5
+STATE_DIM = 4
 BATCH_SIZE = 512
 HORIZON = 64
-MODEL_SAVED_DIRECTORY = 'logs/nn_672000_DIM_5' # under the train_diffusion folder
-EXTRA_MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nmpc_672000_specified_train_validation'
+MODEL_SAVED_DIRECTORY = 'logs/nn_672000_loader_zip' # under the train_diffusion folder
+EXTRA_MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nmpc_672000_loader_zip'
 
+# training data range (get_specified_dataset)
+NORMAL_POS_RANGE = range(0,16000)
+NORMAL_NEG_RANGE = range(16000,32000)
+NOISY_POS_RANGE = range(32000,352000)
+NOISY_NEG_RANGE = range(352000,672000)
 
 
 class EMA:
@@ -188,7 +193,7 @@ tensor_args = {'device': device, 'dtype': torch.float32}
 # move model to device
 model = model.to(device)
 
-# Dataset
+# Dataset (get_dataset  get_specified_dataset)
 
 train_subset, train_dataloader, val_subset, val_dataloader = get_specified_dataset(
     dataset_class='InputsDataset',
@@ -197,12 +202,26 @@ train_subset, train_dataloader, val_subset, val_dataloader = get_specified_datas
     batch_size=batch_size,
     results_dir=results_dir,
     save_indices=True,
+    normal_pos_range = NORMAL_POS_RANGE,
+    normal_neg_range = NORMAL_NEG_RANGE,
+    noisy_pos_range = NOISY_POS_RANGE,
+    noisy_neg_range = NOISY_NEG_RANGE,
     tensor_args=tensor_args
 )
 
-print(f'train_subset -- {len(train_subset.indices)}')
-dataset = train_subset.dataset
-print(f'dataset -- {dataset}')
+# train_subset, train_dataloader, val_subset, val_dataloader = get_dataset(
+#     dataset_class='InputsDataset',
+#     include_velocity=include_velocity,
+#     dataset_subdir=dataset_subdir,
+#     batch_size=batch_size,
+#     results_dir=results_dir,
+#     save_indices=True,
+#     tensor_args=tensor_args
+# )
+
+# print(f'train_subset -- {len(train_subset.indices)}')
+# dataset = train_subset.dataset
+# print(f'dataset -- {dataset}')
 
 # Loss
 loss_fn = val_loss_fn = criterion = torch.nn.MSELoss()
@@ -278,9 +297,9 @@ with tqdm(total=(len(train_dataloader)-1) * epochs, mininterval=1 if debug else 
 
                 # derive the inputs and targets
                 inputs = train_batch_dict['condition_normalized']
-                # print(f'inputs size -- {inputs.size()}')
+                # print(f'inputs -- {inputs}')
                 targets = train_batch_dict['inputs_normalized']
-                # print(f'targets size -- {targets.size()}')
+                # print(f'targets  -- {targets}')
 
                 # Forward pass: Get predictions from the model
                 outputs = model(inputs,batch_size,horizon = HORIZON)
