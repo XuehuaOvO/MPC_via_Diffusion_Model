@@ -316,6 +316,8 @@ def train(model=None, train_dataloader=None, epochs=None, lr=None, steps_til_sum
                     save_models_to_disk([(model, 'model'), (ema_model, 'ema_model')],
                                         epoch, train_steps_current, checkpoints_dir)
                     save_losses_to_disk(train_losses_l, validation_losses_l, checkpoints_dir)
+                    print(f"\n-----------------------------------------")
+                    print(f'New model has been saved in the checkpoints dir!!!')
 
                 if stop_training or (max_steps is not None and train_steps_current == max_steps):
                     break

@@ -183,7 +183,7 @@ def experiment(
     rng0 = np.array(rng0,dtype=float)
 
     # one initial state for test
-    test = 32                                                                            # ++++++++++++++++++ test_num
+    test = 0                                                                            # ++++++++++++++++++ test_num
 
     x_0 = rng0[test,0]
     x_0= round(x_0, 3)
@@ -193,7 +193,7 @@ def experiment(
 
     #initial context
     x0 = np.array([[x_0 , 0, theta_0, 0]])  # np.array([[x_0 , 0, theta_0, 0]])  
-
+    print(f'x0 -- {x0}')
     ############################################################################
     # sampling loop
     num_loop = 32
@@ -420,6 +420,25 @@ def experiment(
     plt.xlabel('Control Step')
     plt.grid()
     plt.show()
+
+    ########## Performance Check ############
+    position_difference = np.sum(np.abs(x_track[0, :] - x_mpc_track[0, :]))
+    print(f'position_difference - {position_difference}')
+
+    velocity_difference = np.sum(np.abs(x_track[1, :] - x_mpc_track[1, :]))
+    print(f'velocity_difference - {velocity_difference}')
+
+    theta_difference = np.sum(np.abs(x_track[2, :] - x_mpc_track[2, :]))
+    print(f'theta_difference - {theta_difference}')
+
+    thetaVel_difference = np.sum(np.abs(x_track[3, :] - x_mpc_track[3, :]))
+    print(f'thetaVel_difference - {thetaVel_difference}')
+
+    u_difference = np.sum(np.abs(u_track.reshape(num_loop,)- u_mpc_track.reshape(num_loop,)))
+    print(f'u_difference - {u_difference}')
+
+
+
 
 
 

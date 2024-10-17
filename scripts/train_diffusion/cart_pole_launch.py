@@ -121,7 +121,7 @@ for dataset_subdir, include_velocity, use_ema, variance_schedule, n_diffusion_st
         num_train_steps=50000,
 
         # steps_til_ckpt=50000,
-        steps_til_ckpt=5000,
+        steps_til_ckpt=2000,
 
         # steps_til_summary=20000,
         steps_til_summary=2000,

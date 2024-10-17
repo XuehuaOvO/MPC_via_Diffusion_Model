@@ -170,9 +170,35 @@ import os
 # print(text_condition_hidden_dims)
 
 
-context = torch.rand(6,4)
-print(context.size())
-mask_shape = torch.rand(context.size(0),1)
-# print(mask_shape)
-mask_size = torch.zeros_like(mask_shape)
-print(mask_size)
+# context = torch.rand(6,4)
+# print(context.size())
+# mask_shape = torch.rand(context.size(0),1)
+# # print(mask_shape)
+# mask_size = torch.zeros_like(mask_shape)
+# print(mask_size)
+
+
+
+# load initial starting state x0
+rng_x = np.linspace(-1,1,10) # 10 x_0 samples
+rng_theta = np.linspace(-np.pi/4,np.pi/4,10) # 10 theta_0 samples
+
+# all possible initial states combinations
+rng0 = []
+for m in rng_x:
+    for n in rng_theta:
+        rng0.append([m,n])
+rng0 = np.array(rng0,dtype=float)
+
+# one initial state for test
+test = 64                                                                            # ++++++++++++++++++ test_num
+
+x_0 = rng0[test,0]
+x_0= round(x_0, 3)
+theta_0 = rng0[test,1]
+theta_0= round(theta_0, 3)
+
+
+#initial context
+x0 = np.array([[x_0 , 0, theta_0, 0]])  # np.array([[x_0 , 0, theta_0, 0]])  
+print(f'x0 -- {x0}')

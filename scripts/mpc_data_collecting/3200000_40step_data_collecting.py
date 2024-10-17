@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 ############### Seetings #######################
 
 # data saving folder
-folder_path = "/root/cartpoleDiff/cartpole_lmpc_data"
+folder_path = "/home/xiao/mpd-public/scripts/mpc_data_collecting"
 
 # simulation time
 T = 3.1  # Total time (seconds) 6.5
@@ -78,10 +78,10 @@ P = np.diag([100, 1, 100, 1])
 # x_ref = ca.SX.sym('x_ref', 4)
 
 # Define the initial states range
-rng_x = np.linspace(-3,3,20) 
-rng_x_dot = np.linspace(-3,3,20)   
-rng_theta = np.linspace(-1,1,10)
-rng_theta_dot = np.linspace(-np.pi,np.pi,20) 
+rng_x = np.linspace(-3,3,2) 
+rng_x_dot = np.linspace(-3,3,2)   
+rng_theta = np.linspace(-1,1,1)
+rng_theta_dot = np.linspace(-np.pi,np.pi,2) 
 rng0 = []
 for m in rng_x:
     for n in rng_x_dot:
@@ -236,10 +236,10 @@ print(f'first_x0 -- {x_all_tensor[0,:]}')
 print(f'first_pre_x -- {x_predicted_tensor[0,:,:]}')
 
 # save u data in PT file for training
-torch.save(u_all_tensor, os.path.join(folder_path, f'u-tensor_2400000-8-1.pt'))
+torch.save(u_all_tensor, os.path.join(folder_path, f'u-tensor_240-8-1.pt'))
 
 # save x0 data in PT file as conditional info in training
-torch.save(x_all_tensor, os.path.join(folder_path, f'x0-tensor_2400000-4.pt'))
+torch.save(x_all_tensor, os.path.join(folder_path, f'x0-tensor_240-4.pt'))
 
 # save x_predicted data in PT file for possible cost calculation
-torch.save(x_predicted_tensor, os.path.join(folder_path, f'x_predicted_tensor_2400000-9-4.pt'))
+torch.save(x_predicted_tensor, os.path.join(folder_path, f'x_predicted_tensor_240-9-4.pt'))
