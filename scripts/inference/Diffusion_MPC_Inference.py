@@ -5,7 +5,6 @@ import control
 import numpy as np
 import os
 
-#import einops
 import matplotlib.pyplot as plt
 import torch
 from einops._torch_specific import allow_ops_in_compiled_graph  # requires einops>=0.6.1
@@ -22,16 +21,19 @@ from torch_robotics.torch_utils.torch_utils import get_torch_device, freeze_torc
 allow_ops_in_compiled_graph()
 
 
-TRAINED_MODELS_DIR = '../../data_trained_models/'
-MODEL_FOLDER = '2406400_training_data'
+TRAINED_MODELS_DIR = '../../trained_models/' # main loader of all saved trained models
+MODEL_FOLDER = '180000_training_data' # choose a folder in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
+MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/180000_training_data/100000' # the absolute path of the trained model
+MODEL_ID = '100000' # number of training
 
-MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/data_trained_models/2406400_training_data/200000'
-MODEL_ID = 200000
-WEIGHT_GUIDANC = 0.01
-X0_IDX = 95 # range:[0,99]
-ITERATIONS = 50
-HORIZON = 8
-U_SAVED_PATH = '/root/cartpoleDiff/cartpole_inference_u_results'
+POSITION_INITIAL_RANGE = np.linspace(-1,1,5) 
+THETA_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4,5) 
+WEIGHT_GUIDANC = 0.01 # non-conditioning weight
+X0_IDX = 18 # range:[0,24] 5*5 data 
+ITERATIONS = 50 # control loop (steps)
+HORIZON = 8 # mpc horizon
+
+RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/180000set'
 
 # cart pole dynamics
 def cart_pole_dynamics(x, u):
@@ -148,8 +150,8 @@ def experiment(
 
     #################################################################
     # load initial starting state x0
-    rng_x = np.linspace(-1,1,10) # 10 x_0 samples
-    rng_theta = np.linspace(-np.pi/4,np.pi/4,10) # 10 theta_0 samples
+    rng_x = POSITION_INITIAL_RANGE # 20 x_0 samples
+    rng_theta = THETA_INITIAL_RANGE # 20 theta_0 samples
     
     # all possible initial states combinations
     rng0 = []
@@ -162,13 +164,14 @@ def experiment(
     test = X0_IDX
 
     x_0 = rng0[test,0]
-    x_0= round(x_0, 3)
+    x_0= round(x_0, 4)
     theta_0 = rng0[test,1]
-    theta_0= round(theta_0, 3)
+    theta_0= round(theta_0, 4)
 
 
     #initial context
-    x0 = np.array([[x_0 , 0, theta_0, 0]])  # np.array([[x_0 , 0, theta_0, 0]])  
+    x0 = np.array([[x_0 , 0, theta_0, 0]])  # np.array([[x_0 , 0, theta_0, 0]]) 
+    initial_state = x0   
 
     ############################################################################
     # sampling loop
@@ -176,8 +179,14 @@ def experiment(
     x_track = np.zeros((4, num_loop+1))
     u_track = np.zeros((1, num_loop))
     u_horizon_track = np.zeros((num_loop, HORIZON))
+    x_horizon_track = np.zeros((num_loop, HORIZON+1, 4))
 
     x_track[:,0] = x0
+    x_updated_by_u = np.zeros((HORIZON+1, 4))
+
+    # time recording 
+    Diffusion_total_time = 0
+    MPC_total_time = 0
 
     for i in range(0, num_loop):
         x0 = torch.tensor(x0).to(device) # load data to cuda
@@ -219,7 +228,7 @@ def experiment(
 
         ########
         # Sample u with classifier-free-guidance (CFG) diffusion model
-        with TimerCUDA() as timer_model_sampling:
+        with TimerCUDA() as t_diffusion_time:
             inputs_normalized_iters = model.run_CFG(
                 context, hard_conds, context_weight,
                 n_samples=n_samples, horizon=n_support_points,
@@ -227,7 +236,9 @@ def experiment(
                 sample_fn=ddpm_cart_pole_sample_fn,
                 n_diffusion_steps_without_noise=n_diffusion_steps_without_noise,
             )
-        print(f't_model_sampling: {timer_model_sampling.elapsed:.3f} sec')
+        print(f't_model_sampling: {t_diffusion_time.elapsed:.4f} sec')
+        single_Diffusion_time = np.round(t_diffusion_time.elapsed,4)
+        Diffusion_total_time += single_Diffusion_time
         # t_total = timer_model_sampling.elapsed
 
         ########
@@ -252,6 +263,15 @@ def experiment(
         u_track[:,i] = applied_input
         u_horizon_track[i,:] = horizon_inputs
 
+        # update states along the horizon
+        x_updated_by_u[0,:] = x0
+        x0_horizon = np.squeeze(x0.numpy())
+        for z in range(0,horizon_inputs.shape[1]):
+            x_horizon_update = cart_pole_dynamics(x0_horizon, horizon_inputs[0,z])
+            x_updated_by_u[z+1,:] = x_horizon_update.T
+            x0_horizon = x_horizon_update
+        x_horizon_track[i,:,:] = np.round(x_updated_by_u, decimals=4)
+
         # update cart pole state
         x_next = cart_pole_dynamics(x0_array, applied_input)
         print(f'x_next-- {x_next}')
@@ -260,6 +280,15 @@ def experiment(
 
         # save the new state
         x_track[:,i+1] = x0
+
+        x_updated_by_u = np.zeros((HORIZON+1, 4))
+        x_updated_by_u[0,:] = x0
+
+        # save new starting state along the horizon
+        x_updated_by_u = np.zeros((HORIZON+1, 4))
+        x_updated_by_u[0,:] = x0
+
+
 
     # print all x and u 
     print(f'x_track-- {x_track.T}')
@@ -277,6 +306,8 @@ def experiment(
     # print(t.shape)
 
     N = HORIZON # prediction horizon
+    
+    x_mpc_horizon_track = np.zeros((num_loop, HORIZON+1, 4))
 
     # mpc parameters
     Q = np.diag([10, 1, 10, 1]) 
@@ -284,8 +315,8 @@ def experiment(
     P = np.diag([100, 1, 100, 1])
 
     # Define the initial states range
-    rng_x = np.linspace(-1,1,10) 
-    rng_theta = np.linspace(-np.pi/4,np.pi/4,10) 
+    rng_x = POSITION_INITIAL_RANGE
+    rng_theta = THETA_INITIAL_RANGE
     rng0 = []
     for m in rng_x:
         for n in rng_theta:
@@ -301,9 +332,9 @@ def experiment(
     u_mpc_horizon_track = np.zeros((num_loop, HORIZON))
 
     x_0 = rng0[test,0]
-    x_0= round(x_0, 3)
+    x_0= round(x_0, 4)
     theta_0 = rng0[test,1]
-    theta_0= round(theta_0, 3)
+    theta_0= round(theta_0, 4)
 
     #save the initial states
     x0 = np.array([x_0, 0, theta_0, 0])  # Initial states
@@ -341,7 +372,11 @@ def experiment(
 
         optimizer.minimize(cost)
         optimizer.solver('ipopt')
-        sol = optimizer.solve()
+        with TimerCUDA() as t_MPC_sampling:
+            sol = optimizer.solve()
+        print(f't_MPC_sampling: {t_MPC_sampling.elapsed:.4f} sec')
+        single_MPC_time = np.round(t_MPC_sampling.elapsed,4)
+        MPC_total_time += single_MPC_time
 
         X_sol = sol.value(X_pre)
         # print(f'X_sol_shape -- {X_sol.shape}')
@@ -352,6 +387,8 @@ def experiment(
         x0 = X_sol[:,1]
         print(f'x0_new-- {x0}')
         x_mpc_track[:,i+1] = x0
+
+        x_mpc_horizon_track[i,:,:] = np.round(X_sol.T, decimals=4)
 
         #save the first computed control input
         u_mpc_track[:,i] = U_sol[0]
@@ -367,7 +404,7 @@ def experiment(
 
     ########################## Diffusion & MPC Control Inputs Results Saving ################################
 
-    results_folder = os.path.join(U_SAVED_PATH, 'model_'+ str(MODEL_ID), 'x0_'+ str(X0_IDX))
+    results_folder = os.path.join(RESULTS_SAVED_PATH, 'model_'+ str(MODEL_ID), 'x0_'+ str(X0_IDX))
     os.makedirs(results_folder, exist_ok=True)
     
     # save the first u 
@@ -388,10 +425,21 @@ def experiment(
     mpc_u_horizon_path = os.path.join(results_folder, mpc_u_horizon)
     np.save(mpc_u_horizon_path, u_mpc_horizon_track)
 
+    ########################## Diffusion & MPC States Results Saving ################################
+    # save diffusion states along horizon
+    diffusion_states = 'x_diffusion_horizon.npy'
+    diffusion_states_path = os.path.join(results_folder, diffusion_states)
+    np.save(diffusion_states_path, x_horizon_track)
+
+    # save mpc states along horizon
+    mpc_states = 'x_mpc_horizon.npy'
+    mpc_states_path = os.path.join(results_folder, mpc_states)
+    np.save(mpc_states_path, x_mpc_horizon_track)
+
     ########################## plot ################################
     num_i = num_loop
-    step = np.linspace(0,num_i+2,num_i+1)
-    step_u = np.linspace(0,num_i+1,num_i)
+    step = np.linspace(0,num_i,num_i+1)
+    step_u = np.linspace(0,num_i-1,num_i)
 
     plt.figure(figsize=(10, 8))
 
@@ -447,6 +495,11 @@ def experiment(
 
     u_difference = np.sum(np.abs(u_track.reshape(num_loop,) - u_mpc_track.reshape(num_loop,)))
     print(f'u_difference - {u_difference}')
+
+    print(f'initial_state -- {initial_state}')
+
+    print(f'Diffusion_total_time -- {Diffusion_total_time}')
+    print(f'MPC_total_time -- {MPC_total_time}')
 
 
 

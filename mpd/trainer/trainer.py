@@ -1,5 +1,6 @@
 import copy
 from math import ceil
+import shutil
 
 import numpy as np
 import os
@@ -128,6 +129,7 @@ def train(model=None, train_dataloader=None, epochs=None, lr=None, steps_til_sum
           use_amp=False,
           early_stopper_patience=-1,
           debug=False,
+          model_saving_address = None,
           text_conditioner = None,
           tensor_args=DEFAULT_TENSOR_ARGS,
           **kwargs
@@ -136,6 +138,9 @@ def train(model=None, train_dataloader=None, epochs=None, lr=None, steps_til_sum
     print(f'\n------- TRAINING STARTED -------\n')
     print("Current CUDA device:", torch.cuda.current_device())
     print(f"epochs {epochs}")
+    print(f'model_dir -- {model_dir}')
+    print(f'lr -- {lr}')
+    print(f'model_saving_address -- {model_saving_address}')
     ema_model = None
     if use_ema:
         # Exponential moving average model
@@ -318,6 +323,13 @@ def train(model=None, train_dataloader=None, epochs=None, lr=None, steps_til_sum
                     save_losses_to_disk(train_losses_l, validation_losses_l, checkpoints_dir)
                     print(f"\n-----------------------------------------")
                     print(f'New model has been saved in the checkpoints dir!!!')
+                    saved_main_folder = model_saving_address
+                    os.makedirs(saved_main_folder, exist_ok=True)
+                    middle_model_dir = os.path.join(saved_main_folder, str(train_steps_current))
+                    # os.makedirs(middle_model_dir, exist_ok=True)
+                    print(f'model dir path -- {middle_model_dir}')
+                    shutil.copytree(model_dir, middle_model_dir)
+                    print(f'New model {train_steps_current} has been saved !!!')
 
                 if stop_training or (max_steps is not None and train_steps_current == max_steps):
                     break
@@ -337,5 +349,8 @@ def train(model=None, train_dataloader=None, epochs=None, lr=None, steps_til_sum
         save_models_to_disk([(model, 'model'), (ema_model, 'ema_model')],
                             epoch, train_steps_current, checkpoints_dir)
         save_losses_to_disk(train_losses_l, validation_losses_l, checkpoints_dir)
+        final_model_dir = os.path.join(saved_main_folder, 'final')
+        shutil.copytree(model_dir, final_model_dir)
+        print(f'Final model has been saved !!!')
 
         print(f'\n------- TRAINING FINISHED -------')

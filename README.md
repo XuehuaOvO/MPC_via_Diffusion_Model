@@ -6,11 +6,6 @@ Carvalho, J.; Le, A.T.; Baierl, M.; Koert, D.; Peters, J. (2023). **_Motion Plan
 [<img src="https://img.shields.io/badge/arxiv-%23B31B1B.svg?&style=for-the-badge&logo=arxiv&logoColor=white" />](https://arxiv.org/abs/2308.01557)
 
 
-<p float="middle">
-  <img src="figures/EnvDense2D-RobotPointMass.gif" width="45%" />
-  <img src="figures/EnvSpheres3D-RobotPanda.gif" width="45%" />
-</p>
-
 ---
 
 ## Installation for cart pole diffusion
@@ -23,8 +18,8 @@ Clone this repository with
 ```bash
 cd ~
 git clone https://github.com/XuehuaOvO/cart_pole_diffusion_based_on_MPD.git
-git submodule update --init --recursive # Initialize and update the submodules
 cd cart_pole_diffusion_based_on_MPD
+git submodule update --init --recursive # Initialize and update the submodules
 ```
 
 Download [IsaacGym Preview 4](https://developer.nvidia.com/isaac-gym) via wget for remote container and extract it under `deps/isaacgym`
@@ -36,9 +31,17 @@ tar -xvf isaac-gym-preview-4
 ```
 
 Run the bash setup script to install everything.
-```
+```bash
 cd ~/cart_pole_diffusion_based_on_MPD
 bash setup.sh
+```
+
+Extra pkg for cart pole diffusion:
+```bash
+cd ~/cart_pole_diffusion_based_on_MPD
+bash setup.sh
+conda install -c conda-forge control slycot 
+conda install conda-forge::casadi
 ```
 
 Possible Errors:
@@ -59,6 +62,47 @@ pip install numpy==1.23.5
 ```
 
 ## linear mpc data collecting
+1. Collecting noisy data (only the initial range of position and theta can be set, initial x_dot and theta_dot are always 0. Some parameters and paths in noisy_data_collecting.py should be set manually): 
+```bash
+conda activate mpd
+cd scripts/mpc_data_collecting
+python noisy_data_collecting.py
+```
+
+2. Collecting data with 4 DoF initial range (Some parameters and paths in 4DoF_data_collecting.py should be set manually):
+```bash
+conda activate mpd
+cd scripts/mpc_data_collecting
+python 4DoF_data_collecting.py
+```
+
+## cart pole model training
+Training Data Path and File Name Setting:
+In cart_pole_u.py, 
+```python
+DATASET_BASE_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data' # training data path of the training data and condition data files
+
+U_DATA_NAME = 'u_tensor_420000-8-1.pt' # training data file name
+X0_CONDITION_DATA_NAME = 'x0_tensor_420000-4.pt' # condition data file name
+```
+
+Training Launcg setting:
+In cart_pole_launch.py,
+```python
+# training data folder
+DATASET_SUBDIR = 'CartPole-LMPC' # the folder of the training data files (location: /root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC)
+
+# training data amount
+TRAINING_DATA_AMOUNT = 420000
+
+# learning parameters
+BATCH_SIZE = 512
+LEARNING_RATE = 3e-3
+
+EPOCHES = 300 # times that the whole data should be trained
+
+MODEL_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/420000_training_data'
+```
 
 ## Running the cart pole inference
 Based on a trained diffusion model, the cart pole inference is running via
@@ -66,9 +110,9 @@ Based on a trained diffusion model, the cart pole inference is running via
 ```bash
 conda activate mpd
 cd scripts/inference
-python cart_pole_inference.py 
+python Diffusion_MPC_Inference.py  
 ```
-
+The diffusion & mpc performance plot will be saved in the results_inference folder under the MODEL_PATH set in Diffusion_MPC_Inference.py.
 
 ---
 ## Running the MPD inference
@@ -84,6 +128,11 @@ gdown --id 1mmJAFg6M2I1OozZcyueKp_AP0HHkCq2k
 tar -xvf data_trajectories.tar.gz
 gdown --id 1I66PJ5QudCqIZ2Xy4P8e-iRBA8-e2zO1
 tar -xvf data_trained_models.tar.gz
+```
+
+To solve the possible error about pyopensll Version,
+```bash
+pip install --upgrade pyOpenSSL
 ```
 
 Run the inference script

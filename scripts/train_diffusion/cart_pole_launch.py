@@ -7,6 +7,23 @@ from experiment_launcher.utils import is_local
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
 ########################################################################################################################
+
+####### Setting ######
+
+# training data folder
+DATASET_SUBDIR = 'CartPole-LMPC' # the folder of the training data files (location: /root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC)
+
+# training data amount
+TRAINING_DATA_AMOUNT = 180000
+
+# learning parameters
+BATCH_SIZE = 512
+LEARNING_RATE = 3e-3
+
+EPOCHES = 300 # times that the whole data should be trained
+
+MODEL_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/180000_training_data'
+
 # LAUNCHER
 
 LOCAL = is_local()
@@ -23,7 +40,7 @@ N_CORES = N_EXPS_IN_PARALLEL * 4
 MEMORY_SINGLE_JOB = 1200
 MEMORY_PER_CORE = N_EXPS_IN_PARALLEL * MEMORY_SINGLE_JOB // N_CORES
 PARTITION = 'gpu' if USE_CUDA else 'amd3,amd2,amd'
-GRES = 'gpu:0' if USE_CUDA else None  # gpu:0 NVIDIA T1200 (laptop)
+GRES = 'gpu:0' if USE_CUDA else None
 CONDA_ENV = 'mpd'
 
 
@@ -59,7 +76,7 @@ launcher = Launcher(
 # ]
 
 dataset_subdir_l = [
-    'CartPole-LMPC'
+    DATASET_SUBDIR
 ]
 
 include_velocity_l = [
@@ -89,8 +106,8 @@ unet_dim_mults_option_l = [
 ]
 
 
-batch_size = 64
-lr = 3e-4
+batch_size = BATCH_SIZE
+lr = LEARNING_RATE
 
 
 wandb_options = dict(
@@ -118,10 +135,13 @@ for dataset_subdir, include_velocity, use_ema, variance_schedule, n_diffusion_st
 
         batch_size=batch_size,
         # num_train_steps=500000,
-        num_train_steps=50000,
+        num_train_steps = TRAINING_DATA_AMOUNT*EPOCHES/BATCH_SIZE, # 246093.75
+
+        model_saving_address = MODEL_SAVED_PATH,
 
         # steps_til_ckpt=50000,
         steps_til_ckpt=2000,
+        steps_til_ckpt=10000, # 10000
 
         # steps_til_summary=20000,
         steps_til_summary=2000,

@@ -32,6 +32,7 @@ allow_ops_in_compiled_graph()
 
 
 TRAINED_MODELS_DIR = '../../data_trained_models/'
+WEIGHT_GUIDANC = 0.01
 
 def cart_pole_dynamics(x, u):
     A = np.array([
@@ -89,7 +90,7 @@ def experiment(
     # model_id: str = 'EnvNarrowPassageDense2D-RobotPointMass',
     # model_id: str = 'EnvSimple2D-RobotPointMass',
     # model_id: str = 'EnvSpheres3D-RobotPanda', model_id: str = 'EnvDense2D-RobotPointMass'
-    model_id: str = 'CartPole_LMPC',
+    model_id: str = '2406400_training_data', # CartPole-LMPC   -49600
 
     # planner_alg: str = 'diffusion_prior',
     # planner_alg: str = 'diffusion_prior_then_guide',
@@ -126,7 +127,7 @@ def experiment(
     # **kwargs
 ):
     ##############################################################
-    fix_random_seed(seed)
+    # fix_random_seed(seed)
 
     device = get_torch_device(device)
     tensor_args = {'device': device, 'dtype': torch.float32}
@@ -148,7 +149,7 @@ def experiment(
 
     ################################################################
     # model_dir = os.path.join(TRAINED_MODELS_DIR, model_id)
-    model_dir = '/home/xiao/mpd-public/data_trained_models/CartPole-LMPC'
+    model_dir = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/data_trained_models/2406400_training_data/200000' # /home/xiao/mpd-public/data_trained_models/CartPole-LMPC
     results_dir = os.path.join(model_dir, 'results_inference', str(seed))
     
     os.makedirs(results_dir, exist_ok=True)
@@ -156,7 +157,7 @@ def experiment(
     args = load_params_from_yaml(os.path.join(model_dir, "args.yaml"))
 
     #################################################################
-    # Load dataset with env, robot, task
+    # Load dataset
     train_subset, train_dataloader, val_subset, val_dataloader = get_dataset(
         dataset_class='InputsDataset',
         **args,
@@ -184,6 +185,7 @@ def experiment(
 
     # one initial state for test
     test = 0                                                                            # ++++++++++++++++++ test_num
+    test = 64                                                                          # ++++++++++++++++++ test_num
 
     x_0 = rng0[test,0]
     x_0= round(x_0, 3)
@@ -203,13 +205,13 @@ def experiment(
     x_track[:,0] = x0
 
     for i in range(0, num_loop):
-        x0 = torch.tensor(x0)
+        x0 = torch.tensor(x0).to(device) # load data to cuda
         # print(f'x0 -- {x0}')
         # print(f'x0 -- {x0.size()}')
         hard_conds = None
         context = dataset.normalize_condition(x0)
         # context_mask  = torch.zeros(context.size(0),1).to(device) # context_mask=1
-        context_weight = 9                                                                # ++++++++++++++++++ weight
+        context_weight = WEIGHT_GUIDANC                                                               # ++++++++++++++++++ weight
 
         #########################################################################
         # Load prior model
@@ -268,6 +270,7 @@ def experiment(
 
         print(f'\n--------------------------------------\n')
         
+        x0 = x0.cpu() # copy cuda tensor at first to cpu
         x0_array = np.squeeze(x0.numpy()) # matrix (1*4) to vector (4)
         applied_input = round(inputs_final[0,0].item(),4) # retain 4 decimal places
 
@@ -419,9 +422,12 @@ def experiment(
     plt.ylabel('Ctl Input (N)')
     plt.xlabel('Control Step')
     plt.grid()
-    plt.show()
+    # plt.show()
+    # save figure 
+    figure_path = os.path.join(results_dir, '24-64.png')
+    plt.savefig(figure_path)
 
-    ########## Performance Check ############
+    ######### Performance Check #########
     position_difference = np.sum(np.abs(x_track[0, :] - x_mpc_track[0, :]))
     print(f'position_difference - {position_difference}')
 
@@ -434,11 +440,8 @@ def experiment(
     thetaVel_difference = np.sum(np.abs(x_track[3, :] - x_mpc_track[3, :]))
     print(f'thetaVel_difference - {thetaVel_difference}')
 
-    u_difference = np.sum(np.abs(u_track.reshape(num_loop,)- u_mpc_track.reshape(num_loop,)))
+    u_difference = np.sum(np.abs(u_track.reshape(num_loop,) - u_mpc_track.reshape(num_loop,)))
     print(f'u_difference - {u_difference}')
-
-
-
 
 
 
