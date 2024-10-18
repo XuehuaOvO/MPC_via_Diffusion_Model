@@ -2,20 +2,13 @@ import numpy as np
 import os
 import torch
 import torch.nn as nn
-# import wandb
-# import git
 import shutil
 from tqdm.autonotebook import tqdm
 import copy
 from torch_robotics.torch_utils.torch_timer import TimerCUDA
 from torch_robotics.torch_utils.torch_utils import dict_to_device, DEFAULT_TENSOR_ARGS, to_numpy
 from collections import defaultdict
-
-# from experiment_launcher import single_experiment_yaml, run_experiment
-# from mpd import trainer
-# from mpd.models import UNET_DIM_MULTS, ConditionedTemporalUnet
 from mpd.trainer import get_specified_dataset, get_dataset # , get_model, get_loss, get_summary
-# from mpd.trainer.trainer import get_num_epochs
 from torch_robotics.torch_utils.seed import fix_random_seed
 from torch_robotics.torch_utils.torch_utils import get_torch_device
 
@@ -23,15 +16,39 @@ from torch_robotics.torch_utils.torch_utils import get_torch_device
 STATE_DIM = 4
 BATCH_SIZE = 512
 HORIZON = 64
-MODEL_SAVED_DIRECTORY = 'logs/nn_672000_loader_zip' # under the train_diffusion folder
-EXTRA_MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nmpc_672000_loader_zip'
 
-# training data range (get_specified_dataset)
+DATASET_SUBDIR = 'diff_mpc_2024/5_6_noise_3'
+
+MODEL_SAVED_DIRECTORY = 'logs/nn_30' # under the train_diffusion folder
+EXTRA_MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nn_30'
+
+# training data range (for get_specified_dataset)
 NORMAL_POS_RANGE = range(0,16000)
 NORMAL_NEG_RANGE = range(16000,32000)
 NOISY_POS_RANGE = range(32000,352000)
 NOISY_NEG_RANGE = range(352000,672000)
 
+# NN Class
+class AMPCNet(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(AMPCNet, self).__init__()
+        # Define the hidden layers and output layer
+        self.hidden1 = nn.Linear(input_size, 2)  # First hidden layer with 2 neurons
+        self.hidden2 = nn.Linear(2, 50)          # Second hidden layer with 50 neurons
+        self.hidden3 = nn.Linear(50, 50)         # Third hidden layer with 50 neurons
+        self.output = nn.Linear(50, output_size) # Output layer
+
+    def forward(self, x, batch_size, horizon):
+        # Forward pass through the network with the specified activations
+        x = torch.tanh(self.hidden1(x))          # Tanh activation for first hidden layer
+        x = torch.tanh(self.hidden2(x))          # Tanh activation for second hidden layer
+        x = torch.tanh(self.hidden3(x))          # Tanh activation for third hidden layer
+        x = self.output(x)                       # Linear activation (no activation function) for the output layer
+
+        # reshape the output
+        x = x.view(batch_size, horizon, 1) # 512(batch size)*8*1
+
+        return x
 
 class EMA:
     """
@@ -106,29 +123,6 @@ def save_losses_to_disk(train_losses, val_losses, checkpoints_dir=None):
 seed = 0
 fix_random_seed(seed)
 
-# AMPC Model
-class AMPCNet(nn.Module):
-    def __init__(self, input_size, output_size):
-        super(AMPCNet, self).__init__()
-        # Define the hidden layers and output layer
-        self.hidden1 = nn.Linear(input_size, 2)  # First hidden layer with 2 neurons
-        self.hidden2 = nn.Linear(2, 50)          # Second hidden layer with 50 neurons
-        self.hidden3 = nn.Linear(50, 50)         # Third hidden layer with 50 neurons
-        self.output = nn.Linear(50, output_size) # Output layer
-
-    def forward(self, x, batch_size, horizon):
-        # Forward pass through the network with the specified activations
-        x = torch.tanh(self.hidden1(x))          # Tanh activation for first hidden layer
-        x = torch.tanh(self.hidden2(x))          # Tanh activation for second hidden layer
-        x = torch.tanh(self.hidden3(x))          # Tanh activation for third hidden layer
-        x = self.output(x)                       # Linear activation (no activation function) for the output layer
-
-        # reshape the output
-        x = x.view(batch_size, horizon, 1) # 512(batch size)*8*1
-
-        return x
-    
-
 # model input & output size
 input_size = STATE_DIM    # Define your input size based on your problem
 output_size = HORIZON    # Define your output size based on your problem (e.g., regression or single class prediction)
@@ -139,7 +133,7 @@ model = AMPCNet(input_size, output_size)
 # def experiment(
 ########################################################################
 # Dataset
-dataset_subdir = 'CartPole-LMPC'
+dataset_subdir = DATASET_SUBDIR
 include_velocity = False
 
 ########################################################################
@@ -195,39 +189,32 @@ model = model.to(device)
 
 # Dataset (get_dataset  get_specified_dataset)
 
-train_subset, train_dataloader, val_subset, val_dataloader = get_specified_dataset(
-    dataset_class='InputsDataset',
-    include_velocity=include_velocity,
-    dataset_subdir=dataset_subdir,
-    batch_size=batch_size,
-    results_dir=results_dir,
-    save_indices=True,
-    normal_pos_range = NORMAL_POS_RANGE,
-    normal_neg_range = NORMAL_NEG_RANGE,
-    noisy_pos_range = NOISY_POS_RANGE,
-    noisy_neg_range = NOISY_NEG_RANGE,
-    tensor_args=tensor_args
-)
-
-# train_subset, train_dataloader, val_subset, val_dataloader = get_dataset(
+# train_subset, train_dataloader, val_subset, val_dataloader = get_specified_dataset(
 #     dataset_class='InputsDataset',
 #     include_velocity=include_velocity,
 #     dataset_subdir=dataset_subdir,
 #     batch_size=batch_size,
 #     results_dir=results_dir,
 #     save_indices=True,
+#     normal_pos_range = NORMAL_POS_RANGE,
+#     normal_neg_range = NORMAL_NEG_RANGE,
+#     noisy_pos_range = NOISY_POS_RANGE,
+#     noisy_neg_range = NOISY_NEG_RANGE,
 #     tensor_args=tensor_args
 # )
 
-# print(f'train_subset -- {len(train_subset.indices)}')
-# dataset = train_subset.dataset
-# print(f'dataset -- {dataset}')
+train_subset, train_dataloader, val_subset, val_dataloader = get_dataset(
+    dataset_class='InputsDataset',
+    include_velocity=include_velocity,
+    dataset_subdir=dataset_subdir,
+    batch_size=batch_size,
+    results_dir=results_dir,
+    save_indices=True,
+    tensor_args=tensor_args
+)
 
 # Loss
 loss_fn = val_loss_fn = criterion = torch.nn.MSELoss()
-
-# Optimizer
-# optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
 model.train()
 
@@ -269,8 +256,6 @@ os.makedirs(summaries_dir, exist_ok=True)
 checkpoints_dir = os.path.join(model_dir, 'checkpoints')
 os.makedirs(checkpoints_dir, exist_ok=True)
 
-# Early stopping
-# early_stopper = EarlyStopper(patience=early_stopper_patience, min_delta=0)
 
 stop_training = False
 train_steps_current = 0
@@ -349,13 +334,15 @@ with tqdm(total=(len(train_dataloader)-1) * epochs, mininterval=1 if debug else 
                         val_losses = defaultdict(list)
                         total_val_loss = 0.
                         for step_val, batch_dict_val in enumerate(val_dataloader):
+                            if step_val == len(val_dataloader) - 1:
+                                break
                             batch_dict_val = dict_to_device(batch_dict_val, tensor_args['device'])
 
                             # derive the inputs and targets
                             inputs_val = batch_dict_val['condition_normalized']
-                            # print(f'inputs_val size -- {inputs_val.size()}')
+                            print(f'inputs_val size -- {inputs_val.size()}')
                             targets_val = batch_dict_val['inputs_normalized']
-                            # print(f'targets_val size -- {targets_val.size()}')
+                            print(f'targets_val size -- {targets_val.size()}')
 
                             # Forward pass: Get predictions from the model
                             outputs_val = model(inputs_val,batch_size, horizon = HORIZON)
@@ -475,13 +462,11 @@ with tqdm(total=(len(train_dataloader)-1) * epochs, mininterval=1 if debug else 
     save_nn_models_to_disk([(model, 'model'), (ema_model, 'ema_model')],
                         epoch, train_steps_current, checkpoints_dir)
     save_losses_to_disk(train_losses_l, validation_losses_l, checkpoints_dir)
+    saved_main_folder = model_saving_address
     final_model_dir = os.path.join(saved_main_folder, 'final')
+    os.makedirs(saved_main_folder, exist_ok=True)
     shutil.copytree(model_dir, final_model_dir)
     print(f'Final model has been saved !!!')
 
     print(f'\n------- TRAINING FINISHED -------')
 
-
-# if __name__ == '__main__':
-#     # Leave unchanged
-#     run_experiment(experiment)
