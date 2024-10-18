@@ -22,12 +22,33 @@ DATASET_SUBDIR = 'diff_mpc_2024/5_6_noise_3'
 MODEL_SAVED_DIRECTORY = 'logs/nn_30' # under the train_diffusion folder
 EXTRA_MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nn_30'
 
-# training data range (get_specified_dataset)
+# training data range (for get_specified_dataset)
 NORMAL_POS_RANGE = range(0,16000)
 NORMAL_NEG_RANGE = range(16000,32000)
 NOISY_POS_RANGE = range(32000,352000)
 NOISY_NEG_RANGE = range(352000,672000)
 
+# NN Class
+class AMPCNet(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(AMPCNet, self).__init__()
+        # Define the hidden layers and output layer
+        self.hidden1 = nn.Linear(input_size, 2)  # First hidden layer with 2 neurons
+        self.hidden2 = nn.Linear(2, 50)          # Second hidden layer with 50 neurons
+        self.hidden3 = nn.Linear(50, 50)         # Third hidden layer with 50 neurons
+        self.output = nn.Linear(50, output_size) # Output layer
+
+    def forward(self, x, batch_size, horizon):
+        # Forward pass through the network with the specified activations
+        x = torch.tanh(self.hidden1(x))          # Tanh activation for first hidden layer
+        x = torch.tanh(self.hidden2(x))          # Tanh activation for second hidden layer
+        x = torch.tanh(self.hidden3(x))          # Tanh activation for third hidden layer
+        x = self.output(x)                       # Linear activation (no activation function) for the output layer
+
+        # reshape the output
+        x = x.view(batch_size, horizon, 1) # 512(batch size)*8*1
+
+        return x
 
 class EMA:
     """
@@ -98,28 +119,6 @@ def save_losses_to_disk(train_losses, val_losses, checkpoints_dir=None):
     np.save(os.path.join(checkpoints_dir, f'train_losses.npy'), train_losses)
     np.save(os.path.join(checkpoints_dir, f'val_losses.npy'), val_losses)
 
-# AMPC Model
-class AMPCNet(nn.Module):
-    def __init__(self, input_size, output_size):
-        super(AMPCNet, self).__init__()
-        # Define the hidden layers and output layer
-        self.hidden1 = nn.Linear(input_size, 2)  # First hidden layer with 2 neurons
-        self.hidden2 = nn.Linear(2, 50)          # Second hidden layer with 50 neurons
-        self.hidden3 = nn.Linear(50, 50)         # Third hidden layer with 50 neurons
-        self.output = nn.Linear(50, output_size) # Output layer
-
-    def forward(self, x, batch_size, horizon):
-        # Forward pass through the network with the specified activations
-        x = torch.tanh(self.hidden1(x))          # Tanh activation for first hidden layer
-        x = torch.tanh(self.hidden2(x))          # Tanh activation for second hidden layer
-        x = torch.tanh(self.hidden3(x))          # Tanh activation for third hidden layer
-        x = self.output(x)                       # Linear activation (no activation function) for the output layer
-
-        # reshape the output
-        x = x.view(batch_size, horizon, 1) # 512(batch size)*8*1
-
-        return x
-    
 # fixed seed
 seed = 0
 fix_random_seed(seed)
