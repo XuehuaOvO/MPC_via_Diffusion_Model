@@ -184,6 +184,7 @@ def experiment(
     rng0 = np.array(rng0,dtype=float)
 
     # one initial state for test
+    test = 0                                                                            # ++++++++++++++++++ test_num
     test = 64                                                                          # ++++++++++++++++++ test_num
 
     x_0 = rng0[test,0]
@@ -194,7 +195,7 @@ def experiment(
 
     #initial context
     x0 = np.array([[x_0 , 0, theta_0, 0]])  # np.array([[x_0 , 0, theta_0, 0]])  
-
+    print(f'x0 -- {x0}')
     ############################################################################
     # sampling loop
     num_loop = 32

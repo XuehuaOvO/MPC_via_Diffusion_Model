@@ -322,6 +322,7 @@ def train(model=None, train_dataloader=None, epochs=None, lr=None, steps_til_sum
                                         epoch, train_steps_current, checkpoints_dir)
                     save_losses_to_disk(train_losses_l, validation_losses_l, checkpoints_dir)
                     print(f"\n-----------------------------------------")
+                    print(f'New model has been saved in the checkpoints dir!!!')
                     saved_main_folder = model_saving_address
                     os.makedirs(saved_main_folder, exist_ok=True)
                     middle_model_dir = os.path.join(saved_main_folder, str(train_steps_current))
