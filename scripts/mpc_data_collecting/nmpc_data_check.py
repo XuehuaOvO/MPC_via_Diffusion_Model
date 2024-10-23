@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # # data saving folder
-u_folder_path = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC/u_ini_10x20_noise_20_step_80_hor_64.pt'
+u_folder_path = 'cart_pole_diffusion_based_on_MPD/training_data/diff_mpc_2024/u_ini_10x15_noise_15_step_50_hor_64.pt'
 u_nmpc = torch.load(u_folder_path)
 print(f'u_nmpc -- {u_nmpc.size()}')# 672000*64*1
 
-x_folder_path = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC/x0_ini_10x20_noise_20_step_80_hor_64.pt'
+x_folder_path = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/diff_mpc_2024/x0_ini_10x15_noise_15_step_50_hor_64.pt'
 x_nmpc = torch.load(x_folder_path)
 print(f'x_nmpc -- {x_nmpc.size()}') # 672000*5
 

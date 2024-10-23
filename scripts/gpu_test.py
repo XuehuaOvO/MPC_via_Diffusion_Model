@@ -170,9 +170,22 @@ import os
 # print(text_condition_hidden_dims)
 
 
-context = torch.rand(6,4)
-print(context.size())
-mask_shape = torch.rand(context.size(0),1)
-# print(mask_shape)
-mask_size = torch.zeros_like(mask_shape)
-print(mask_size)
+# context = torch.rand(6,4)
+# print(context.size())
+# mask_shape = torch.rand(context.size(0),1)
+# # print(mask_shape)
+# mask_size = torch.zeros_like(mask_shape)
+# print(mask_size)
+
+POSITION_INITIAL_RANGE = np.linspace(-1,1,5) 
+THETA_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4,5) 
+
+rng_x = POSITION_INITIAL_RANGE # 20 x_0 samples
+rng_theta = THETA_INITIAL_RANGE # 20 theta_0 samples
+
+rng0 = []
+for m in rng_x:
+    for n in rng_theta:
+        rng0.append([m,n])
+rng0 = np.array(rng0,dtype=float)
+print(f'initial range -- {rng0}')
