@@ -178,3 +178,9 @@ data_trajectories
 *.pickle
 
 *tar.gz
+deps/isaac-gym-preview-4
+
+# folder ignore
+/model_performance_saving/
+/trained_models/
+/nn_trained_models/
