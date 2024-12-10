@@ -16,6 +16,9 @@ UNET_DIM_MULTS = {
     1: (1, 2, 4, 8)
 }
 
+# load conditioning info size for conditioning_embed_dim (add the conditioning info PT file path)
+CONDITION_DATA = torch.load('/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/Panda-Data/panda_test4/x_data_cat_test4.pt')
+X_SIZE = CONDITION_DATA.size(dim=1)
 
 class TemporalUnet(nn.Module):
 
@@ -188,7 +191,7 @@ class ConditionedTemporalUnet(nn.Module):
             dim_mults=(1, 2, 4),
             time_emb_dim=32,
             self_attention=False,
-            conditioning_embed_dim=4,
+            conditioning_embed_dim=X_SIZE,
             conditioning_type='default',
             attention_num_heads=2,
             attention_dim_head=32,
