@@ -24,12 +24,18 @@ MODEL_ID = 'final' # number of training
 RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/180000set'
 
 # Sampling data
-NUM_SEED = 0
+NUM_SEED = 24
 WEIGHT_GUIDANC = 0.01 # non-conditioning weight
+HORIZON = 128
 TARGET_POS = np.array([0.3, 0.3, 0.5]).reshape(3, 1)
+SAMPLING_STEPS = 200
+CONTROL_RATE = 10
 
 def main():
-    num_seed = 0
+    # memory 
+    x_pos_memory = np.zeros((SAMPLING_STEPS, 3)) 
+    q_pos_memory = np.zeros((SAMPLING_STEPS, 7)) 
+    ctl_memory = np.zeros((SAMPLING_STEPS, 7)) 
 
     # load model path
     model_dir = MODEL_PATH 
@@ -56,37 +62,91 @@ def main():
     print(f'state_dim -- {dataset.state_dim}')
 
     # Sampling initial data
-    ini_joint_states, ini_guess = sampling_data_generating()
+    ini_joint_states = sampling_data_generating()
 
     # panda mujoco
     panda = mujoco.MjModel.from_xml_path('/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/Panda/xml/mjx_scene.xml')
     data = mujoco.MjData(panda)
+
+    # panda initialization
+    data.qpos[:7] = ini_joint_states
+    mujoco.mj_step(panda, data)
    
     # full initial state 20*1
-    x0 = generating_ini_state(panda, data, ini_joint_states)
+    # q0_pos, x0_pos, x0 = generating_ini_state(panda, data, ini_joint_states)
+    # q_pos_memory[0,:] = q0_pos.reshape(7)
+    # x_pos_memory[0,:] = x0_pos.reshape(3)
+    # print(f'initial x pos -- {x0[0,14:17]}')
+    # print(f'xpos_0 --{x0_pos}')
 
     # load trained diffusion model
     model = loading_model(dataset, args, tensor_args, model_dir)
-    
-    # conditioning info
-    x0 = torch.tensor(x0).to(device) # load data to cuda
-    hard_conds = None
-    context = dataset.normalize_condition(x0)
-    context_weight = WEIGHT_GUIDANC
 
-    # sampling
-    with TimerCUDA() as t_diffusion_time:
-        inputs_normalized_iters = model.run_CFG(
-            context, hard_conds, context_weight,
-            n_samples=1, horizon=n_support_points,
-            return_chain=True,
-            sample_fn=ddpm_cart_pole_sample_fn,
-            n_diffusion_steps_without_noise=5,
-        )
-    print(f't_model_sampling: {t_diffusion_time.elapsed:.4f} sec')
-    print(inputs_normalized_iters.size())
+    # set initial conditioning info
+    # x_current = x0.copy()
 
-    
+    # initialize panda step
+    sampling_step = 0
+
+    # diffusion sampling loop
+    for panda_step in range(0, SAMPLING_STEPS*CONTROL_RATE):
+
+        if panda_step % CONTROL_RATE == 0:
+            # current panda data loading
+            q_current_pos, x_current_pos, context_current = state_loading(panda,data)
+            
+            # load context to cuda
+            x_current = torch.tensor(context_current).to(device) 
+
+            # data saving
+            q_pos_memory[sampling_step,:] = q_current_pos.reshape(7)
+            x_pos_memory[sampling_step,:] = x_current_pos.reshape(3)
+
+            # sampling
+            inputs_normalized_iters = diffusion_sampling(x_current, dataset, model, n_support_points)
+
+            # last diffusion result unmormalize
+            inputs_iters = dataset.unnormalize_states(inputs_normalized_iters)
+            inputs_final = inputs_iters[-1] # 1 128 7
+            print(f'control_policy -- {inputs_final.shape}')
+            print(f'\n--------------------------------------\n')
+
+            x_current = x_current.cpu() # copy cuda tensor at first to cpu
+            # x0_array = np.squeeze(x_current.numpy()) # matrix (1*20) to vector (20)
+
+            # horizon_inputs = np.zeros((1, HORIZON, 7))
+            inputs_final = inputs_final.cpu()
+            # for n in range(0,HORIZON):
+            #     horizon_inputs[0,n,:] = round(inputs_final[0,n,:].item(),4)
+            # print(f'horizon_inputs -- {horizon_inputs}')
+            applied_input_tensor = inputs_final[0,0,:]
+            applied_input_array = applied_input_tensor.numpy()
+            # applied_input = round(applied_input_array.item(),4) # retain 4 decimal places
+            print(f'applied_input -- {applied_input_array}')
+            ctl_memory[sampling_step,:] = applied_input_array 
+
+            # Panda states updating
+            data.ctrl[:7] = applied_input_array
+            # mujoco.mj_step(panda, data)
+
+            # q_current_pos, x_current_pos, x_next = state_updating(panda, data)
+            # x_current = x_next
+            print(f'current x pos -- {x_current[0,14:17]}')
+            print(f'sampling step -- {sampling_step}')
+            sampling_step = sampling_step + 1
+
+        mujoco.mj_step(panda, data)
+        if panda_step == SAMPLING_STEPS*CONTROL_RATE-1 :
+            q_last_pos, x_last_pos, context_last = state_loading(panda,data)
+            print(f'final panda x pos -- {x_last_pos}')
+        
+
+
+
+    # plot
+    print(f'sampling finished')
+
+
 
 
 
@@ -122,7 +182,7 @@ def sampling_data_generating():
     sampling_u_guess_list.append([0,0,0,u_guess_4,u_guess_5,0,u_guess_7])
     sampling_ini_u_guess = np.array(sampling_u_guess_list) # 1*7
 
-    return sampling_ini_states, sampling_ini_u_guess
+    return sampling_ini_states
 
 
 # Jacobian Matrix
@@ -140,7 +200,7 @@ def compute_jacobian(model, data, tpoint):
     return jacp, jacr
 
 
-# initial state (20*1)
+# generating initial state (20*1)
 def generating_ini_state(panda, data, ini_joint_states):
     data.qpos[:7] = ini_joint_states
     mujoco.mj_step(panda, data)
@@ -159,10 +219,65 @@ def generating_ini_state(panda, data, ini_joint_states):
     x0[7:14] = q_dot_ini[:7]
     x0[14:17] = x_ini
     x0[17:20] = x_dot_ini
+    
+    q0_pos = q_ini[:7]
+    x0_pos = x_ini
 
     x0 = x0.reshape(1,20)
 
-    return x0
+    return q0_pos, x0_pos, x0
+
+
+# state updating
+def state_updating(panda, data):
+    q_current = np.array(data.qpos).reshape(-1, 1)
+    q_dot_current = np.array(data.qvel).reshape(-1, 1)
+    x_current = np.array(data.xpos[9,:]).reshape(-1, 1)
+    
+    # compute 'hand' x_dot 
+    jacp, _ = compute_jacobian(panda, data, TARGET_POS)
+    jacp = jacp[:, :7]
+    x_dot_current = ca.mtimes(jacp, q_dot_current[:7])
+   
+    # full initial state 20*1
+    x_next= np.zeros((20, 1))
+    x_next[:7] = q_current[:7]
+    x_next[7:14] = q_dot_current[:7]
+    x_next[14:17] = x_current
+    x_next[17:20] = x_dot_current
+    
+    q_current_pos = q_current[:7]
+    x_current_pos = x_current
+
+    x_next = x_next.reshape(1,20)
+
+    return q_current_pos, x_current_pos, x_next
+
+
+# current context loading
+def state_loading(panda,data):
+    q_current = np.array(data.qpos).reshape(-1, 1)
+    q_dot_current = np.array(data.qvel).reshape(-1, 1)
+    x_current = np.array(data.xpos[9,:]).reshape(-1, 1)
+    
+    # compute 'hand' x_dot 
+    jacp, _ = compute_jacobian(panda, data, TARGET_POS)
+    jacp = jacp[:, :7]
+    x_dot_current = ca.mtimes(jacp, q_dot_current[:7])
+   
+    # full initial state 20*1
+    context_current= np.zeros((20, 1))
+    context_current[:7] = q_current[:7]
+    context_current[7:14] = q_dot_current[:7]
+    context_current[14:17] = x_current
+    context_current[17:20] = x_dot_current
+    
+    q_current_pos = q_current[:7]
+    x_current_pos = x_current
+
+    context_current = context_current.reshape(1,20)
+
+    return q_current_pos, x_current_pos, context_current
 
 
 # load trained model
@@ -196,8 +311,27 @@ def loading_model(dataset, args, tensor_args, model_dir):
     model = torch.compile(model)
     
     return model
-    
 
+
+# diffusion sampling
+def diffusion_sampling(x_current, dataset, model, n_support_points):
+    hard_conds = None
+    context = dataset.normalize_condition(x_current)
+    context_weight = WEIGHT_GUIDANC
+
+    # sampling
+    with TimerCUDA() as t_diffusion_time:
+        inputs_normalized_iters = model.run_CFG(
+            context, hard_conds, context_weight,
+            n_samples=1, horizon=n_support_points,
+            return_chain=True,
+            sample_fn=ddpm_cart_pole_sample_fn,
+            n_diffusion_steps_without_noise=5,
+        )
+    print(f't_model_sampling: {t_diffusion_time.elapsed:.4f} sec')
+    print(inputs_normalized_iters.size()) # 31 1 128 7
+
+    return inputs_normalized_iters
 
 
 if __name__ == "__main__":
