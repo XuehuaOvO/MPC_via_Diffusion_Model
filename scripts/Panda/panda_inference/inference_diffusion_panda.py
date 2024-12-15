@@ -1,5 +1,5 @@
-from torch_robotics.isaac_gym_envs.motion_planning_envs import PandaMotionPlanningIsaacGymEnv, MotionPlanningController
-from experiment_launcher import single_experiment_yaml, run_experiment
+# from torch_robotics.isaac_gym_envs.motion_planning_envs import PandaMotionPlanningIsaacGymEnv, MotionPlanningController
+# from experiment_launcher import single_experiment_yaml, run_experiment
 from mpd.models import ConditionedTemporalUnet, UNET_DIM_MULTS
 from mpd.models.diffusion_models.sample_functions import guide_gradient_steps, ddpm_sample_fn, ddpm_cart_pole_sample_fn
 from mpd.trainer import get_dataset, get_model
@@ -21,10 +21,10 @@ TRAINED_MODELS_DIR = '../../trained_models/' # main loader of all saved trained 
 MODEL_FOLDER = 'panda_test4_113400 '  #'180000_training_data' # choose a folder in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
 MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/panda_test4_113400/final' #'/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/180000_training_data/100000' # the absolute path of the trained model
 MODEL_ID = 'final' # number of training
-RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/180000set'
+RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/Panda_113400'
 
 # Sampling data
-NUM_SEED = 24
+NUM_SEED = 42
 WEIGHT_GUIDANC = 0.01 # non-conditioning weight
 HORIZON = 128
 TARGET_POS = np.array([0.3, 0.3, 0.5]).reshape(3, 1)
@@ -144,8 +144,65 @@ def main():
 
 
     # plot
-    print(f'sampling finished')
+    joint_name = 'qPOS' + str(ini_joint_states[0,0]) + '_' +  str(ini_joint_states[0,1]) + '_' + str(ini_joint_states[0,2]) + '_' + str(ini_joint_states[0,3]) + '_' + str(ini_joint_states[0,4]) + '_' + str(ini_joint_states[0,5]) + '_' + str(ini_joint_states[0,6]) 
+    figure_saving_path = os.path.join(RESULTS_SAVED_PATH, joint_name)
+    os.makedirs(figure_saving_path, exist_ok=True)
 
+    T = SAMPLING_STEPS
+    t = np.arange(0, T, 1)
+    print(f't -- {len(t)}')
+
+    ######## fig1 xpos 3D ########
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    ax.plot(x_pos_memory[:,0], x_pos_memory[:,1], x_pos_memory[:,2])
+
+    # final & target point
+    point = [x_pos_memory[-1,0], x_pos_memory[-1,1], x_pos_memory[-1,2]]
+    ax.scatter(point[0], point[1], point[2], color='green', s=10)
+    
+    target = TARGET_POS
+    ax.scatter(target[0,0], target[1,0], target[2,0], color='red', s=10)
+
+    # Set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    ax.set_xlim([-1.5, 1.5])  # x-axis range
+    ax.set_ylim([-1.5, 1.5])  # y-axis range
+    ax.set_zlim([-1.5, 1.5])   # z-axis range
+    ax.legend()
+
+    figure_name = 'ini_state' + '_' + str(x_pos_memory[0,0]) + '_' + str(x_pos_memory[0,1]) + '_' + str(x_pos_memory[0,2]) + '_' + '_3d' + '.png'
+    figure_path = os.path.join(figure_saving_path, figure_name)
+    plt.savefig(figure_path)
+
+    ######## fig2 qpos ########
+    plt.figure()
+    for i in range(7):
+            plt.plot(t, q_pos_memory[:,i], label=f"Joint {i+1}")
+    plt.xlabel("Sampling Step")
+    plt.ylabel("Joint position [rad]")
+    plt.legend()  
+
+    figure_name = 'Joints trajectories' + '.png'
+    figure_path = os.path.join(figure_saving_path, figure_name)
+    plt.savefig(figure_path)  
+
+    ######## fig3 ctrl ########
+    plt.figure()
+    for i in range(7):
+            plt.plot(t, ctl_memory[:,i], label=f"u {i+1}")
+    plt.xlabel("Sampling Step")
+    plt.ylabel("Control inputs")
+    plt.legend()  
+
+    figure_name = 'Ctrls trajectories' + '.png'
+    figure_path = os.path.join(figure_saving_path, figure_name)
+    plt.savefig(figure_path)  
+
+    plt.show()
 
 
 
@@ -154,8 +211,8 @@ def main():
 
 # initial sampling data generating
 def sampling_data_generating():
-    np.random.seed(NUM_SEED)
-    random.seed(NUM_SEED)
+    # np.random.seed(NUM_SEED)
+    # random.seed(NUM_SEED)
 
     # Gaussian noise for initial states generating
     mean_ini = 0
