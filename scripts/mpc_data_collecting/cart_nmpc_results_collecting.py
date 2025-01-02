@@ -11,20 +11,20 @@ import multiprocessing
 ############### Seetings ######################
 # Attention: this py file can only set the initial range of position and theta, initial x_dot and theta_dot are always 0
 
-MAX_CORE_CPU = 1
+MAX_CORE_CPU = 25
 
 # data saving folder
 SAVE_PATH =  "/MPC_DynamicSys/sharedVol/train_data/nmpc/multi_normal"
-FOLDER_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data_collecting/cart_pole_nmpc'
+FOLDER_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data_collecting/nmpc_cart_pole_collecting'
 
 # control steps
 CONTROL_STEPS = 80
 
 # data range
-NUM_INITIAL_X = 2
-POSITION_INITIAL_RANGE = np.linspace(-1,1,NUM_INITIAL_X) 
+NUM_INITIAL_X = 5
+POSITION_INITIAL_RANGE = np.linspace(-5,5,NUM_INITIAL_X) 
 
-NUM_INIYIAL_THETA = 2
+NUM_INIYIAL_THETA = 5
 THETA_INITIAL_RANGE = np.linspace(3*np.pi/4,5*np.pi/4,NUM_INIYIAL_THETA) 
 
 # number of noisy data for each state
@@ -38,10 +38,10 @@ HOR = 32 # mpc prediction horizon
 
 # initial guess
 INITIAL_GUESS_NUM = 2
-# initial_guess_x = [10, -10]
-# initial_guess_u = [1000, -1000]
-initial_guess_x = [5, 0]
-initial_guess_u = [1000, -10000]
+initial_guess_x = [10, -10]
+initial_guess_u = [1000, -1000]
+# initial_guess_x = [5, 0]
+# initial_guess_u = [1000, -10000]
 
 # save data round to 4 digit
 ROUND_DIG = 6
@@ -65,12 +65,12 @@ np.random.seed(42)
 NUM_STATE = 5
 Q_REDUNDANT = 1000.0
 P_REDUNDANT = 1000.0
-# Q = np.diag([0.01, 0.01, 0, 0.001, Q_REDUNDANT])
-# R = 0.1
-# P = np.diag([0.01, 0.01, 0, 0.001, P_REDUNDANT])
-Q = np.diag([0.01, 0.01, 0, 0.01, Q_REDUNDANT])
-R = 0.001
-P = np.diag([0.01, 0.1, 0, 0.1, P_REDUNDANT])
+Q = np.diag([0.01, 0.01, 0, 0.001, Q_REDUNDANT])
+R = 0.1
+P = np.diag([0.01, 0.01, 0, 0.001, P_REDUNDANT])
+# Q = np.diag([0.01, 0.01, 0, 0.01, Q_REDUNDANT])
+# R = 0.001
+# P = np.diag([0.01, 0.1, 0, 0.1, P_REDUNDANT])
 
 
 TS = 0.01
@@ -261,16 +261,50 @@ def MPC_NormalData_Process(x0, x_ini_guess, u_ini_guess, idx_group_of_control_st
     
     return U_sol[0]
 
+
+def MPC_NoiseData_Process(x0, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_random_memory, x_random_memory, j_random_memory, idx_control_step=0, bAll = False):
+    # noisey_x = np.zeros((NUM_NOISY_DATA, NUM_STATE))
+    # u_for_noisy_x = np.zeros((NUM_NOISY_DATA, HOR, 1))
+    # j_for_noisy_x = np.zeros((NUM_NOISY_DATA))
+    for idx_noisy in range(0,NUM_NOISY_DATA):
+        if (bAll == True): 
+            noise = np.random.normal(NOISE_MEAN, NOISE_SD, size = NUM_STATE)
+            noisy_state = x0 + noise
+        else:
+            noise = np.random.normal(NOISE_MEAN, NOISE_SD, size = (1,2))
+            noisy_state = x0 + [noise[0,0], 0, noise[0,1],0,0]
+        
+        noisy_state[IDX_THETA_RED] = ThetaToRedTheta(noisy_state[IDX_THETA])
+        x_random_memory[idx_control_step*NUM_NOISY_DATA+idx_noisy,:] = noisy_state
+        X_noise_sol, U_noisy_sol, Cost_noise_sol = MPC_Solve(EulerForwardCartpole_virtual_Casadi, dynamic_update_virtual_Casadi, noisy_state, x_ini_guess, u_ini_guess, NUM_STATE, HOR, Q, R, TS, opts_setting)
+        
+        # gey u, j by x
+        u_random_memory[idx_control_step*NUM_NOISY_DATA+idx_noisy,:,0] = U_noisy_sol
+        j_random_memory[idx_control_step*NUM_NOISY_DATA+idx_noisy,0] = Cost_noise_sol
+
+
+    # save noise x,u,j data in 0th step 
+    # idx_start_0step_nosie_data = idx_group_of_control_step*CONTROLSTEP_X_NUMNOISY + idx_control_step*NUM_NOISY_DATA
+    # idx_end_0step_nosie_data = idx_start_0step_nosie_data + NUM_NOISY_DATA
+    
+    # # shared memory with manager list
+    # x_result_noise[idx_start_0step_nosie_data:idx_end_0step_nosie_data] = noisey_x.tolist()
+    # u_result_noise[idx_start_0step_nosie_data:idx_end_0step_nosie_data] = u_for_noisy_x.tolist()
+    # j_result_noise[idx_start_0step_nosie_data:idx_end_0step_nosie_data] = j_for_noisy_x.tolist()
+
+
 def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_group_of_control_step:int,x0_state:np.array, 
-                                      u_ini_memory: np.array, x_ini_memory: np.array, j_ini_memory: np.array):
+                                      u_ini_memory: np.array, x_ini_memory: np.array, j_ini_memory: np.array,
+                                      u_random_memory: np.array, x_random_memory: np.array, j_random_memory: np.array):
 
     ################ generate data for 0th step ##########################################################
     try:
         # normal at x0
+        step = 0
         u0 = MPC_NormalData_Process(x0_state, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_ini_memory, j_ini_memory, x_ini_memory)
         
         # noisy at x0
-        # MPC_NoiseData_Process(x0_state, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_result_noisy, j_result_noisy, x_result_noisy)
+        MPC_NoiseData_Process(x0_state, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_random_memory, x_random_memory, j_random_memory)
         
         ############################################## generate data for control step loop ##############################################
         # main mpc loop
@@ -282,16 +316,39 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
             u0_cur = MPC_NormalData_Process(x0_next, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_ini_memory, j_ini_memory, x_ini_memory, idx_control_step)
 
             ################################## noise  ##################################
-            # MPC_NoiseData_Process(x0_next, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_result_noisy, j_result_noisy, x_result_noisy, idx_control_step, True)
+            MPC_NoiseData_Process(x0_next, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_random_memory, x_random_memory, j_random_memory, idx_control_step, True)
             
             # update
             x0_state = x0_next
             u0 = u0_cur
         
+
+        #################### data saving ####################
         # to tensor
-        # torch_u_ini_memory_tensor = torch.Tensor(u_ini_memory)
-        # torch_x_ini_memory_tensor = torch.Tensor(x_ini_memory)
-        # torch_j_ini_memory_tensor = torch.Tensor(j_ini_memory)
+        torch_u_ini_memory_tensor = torch.Tensor(u_ini_memory)
+        torch_u_random_memory_tensor = torch.Tensor(u_random_memory)
+        torch_x_ini_memory_tensor = torch.Tensor(x_ini_memory)
+        torch_x_random_memory_tensor = torch.Tensor(x_random_memory)
+        torch_j_ini_memory_tensor = torch.Tensor(j_ini_memory)
+        torch_j_random_memory_tensor = torch.Tensor(j_random_memory)
+
+        torch.save(torch_u_ini_memory_tensor, os.path.join(FOLDER_PATH , f'pure_u_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        torch.save(torch_x_ini_memory_tensor , os.path.join(FOLDER_PATH , f'pure_x_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        torch.save(torch_j_ini_memory_tensor, os.path.join(FOLDER_PATH , f'pure_j_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        
+        # cat
+        u_data = torch.cat((torch_u_ini_memory_tensor, torch_u_random_memory_tensor), dim=0)
+        x_data = torch.cat((torch_x_ini_memory_tensor, torch_x_random_memory_tensor), dim=0)
+        j_data = torch.cat((torch_j_ini_memory_tensor, torch_j_random_memory_tensor), dim=0)
+
+        print(f'u_size -- {u_data.size()}')
+        print(f'x_size -- {x_data.size()}')
+        print(f'j_size -- {j_data.size()}')
+
+        # save data in PT file for training
+        torch.save(u_data, os.path.join(FOLDER_PATH , f'u_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        torch.save(x_data, os.path.join(FOLDER_PATH , f'x_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        torch.save(j_data, os.path.join(FOLDER_PATH , f'j_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
 
         # plots
         t = np.arange(0, CONTROL_STEPS*TS, TS) # np.arange(len(joint_states[1])) * panda.opt.timestep
@@ -301,48 +358,46 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         plt.figure()
         for i in range(5):
                 plt.plot(t, x_ini_memory[:,i], label=f"State {i+1}")
-        # for z in range(CONTROL_STEPS):
-        #         for i in range(7):
-        #             noisy_q_each_ctl_step = noi_joint_states[z,:,i]
-        #             for k in range(NOISE_DATA_PER_STATE):
-        #                     plt.scatter(t[z], noisy_q_each_ctl_step[k], color = 'blue')
+        for z in range(CONTROL_STEPS):
+                for i in range(5):
+                    noisy_state_each_ctl_step = x_random_memory[z*NUM_NOISY_DATA:z*NUM_NOISY_DATA+NUM_NOISY_DATA,i]
+                    for k in range(0,NUM_NOISY_DATA):
+                            plt.scatter(t[z], noisy_state_each_ctl_step[k], color = 'blue')
                 
         plt.xlabel("Time [s]")
         plt.ylabel("states")
         plt.legend()
-        figure_name = 'idx-' + str(idx_group_of_control_step) + '_x_new' + '.png'
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_x' + '.png'
         figure_path = os.path.join(FOLDER_PATH, figure_name)
         plt.savefig(figure_path)
 
         # plot 2: u
         plt.figure()
         plt.plot(t, u_ini_memory[:,0,0])
-        # for z in range(CONTROL_STEPS):
-        #         for i in range(7):
-        #             noisy_q_each_ctl_step = noi_joint_states[z,:,i]
-        #             for k in range(NOISE_DATA_PER_STATE):
-        #                     plt.scatter(t[z], noisy_q_each_ctl_step[k], color = 'blue')
+        for z in range(CONTROL_STEPS):
+                noisy_u_each_ctl_step = u_random_memory[z*NUM_NOISY_DATA:z*NUM_NOISY_DATA+NUM_NOISY_DATA,0,0]
+                for k in range(0, NUM_NOISY_DATA):
+                    plt.scatter(t[z], noisy_u_each_ctl_step[k], color = 'blue')
                 
         plt.xlabel("Time [s]")
         plt.ylabel("control input")
         plt.legend()
-        figure_name = 'idx-' + str(idx_group_of_control_step) + '_u_new' + '.png'
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_u' + '.png'
         figure_path = os.path.join(FOLDER_PATH, figure_name)
         plt.savefig(figure_path)
 
         # plot 3: cost
         plt.figure()
         plt.plot(t, j_ini_memory[:,0])
-        # for z in range(CONTROL_STEPS):
-        #         for i in range(7):
-        #             noisy_q_each_ctl_step = noi_joint_states[z,:,i]
-        #             for k in range(NOISE_DATA_PER_STATE):
-        #                     plt.scatter(t[z], noisy_q_each_ctl_step[k], color = 'blue')
+        for z in range(CONTROL_STEPS):
+                noisy_j_each_ctl_step = j_random_memory[z*NUM_NOISY_DATA:z*NUM_NOISY_DATA+NUM_NOISY_DATA,0]
+                for k in range(0, NUM_NOISY_DATA):
+                    plt.scatter(t[z], noisy_j_each_ctl_step[k], color = 'blue')
                 
         plt.xlabel("Time [s]")
         plt.ylabel("cost")
         plt.legend()
-        figure_name = 'idx-' + str(idx_group_of_control_step) + '_j_new' + '.png'
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_j' + '.png'
         figure_path = os.path.join(FOLDER_PATH, figure_name)
         plt.savefig(figure_path)
 
@@ -446,12 +501,12 @@ def main():
 
 
     # memories for data
-    u_ini_memory = np.zeros((1*CONTROL_STEPS, HOR, 1)) # 1*200, 128, 7 np.zeros((NUM_INI_STATES*1*CONTROL_STEPS, 128, 7)).tolist()
-    # u_random_memory = np.zeros((NOISE_DATA_PER_STATE*CONTROL_STEPS, 128, 7))# 20*200, 128, 7 np.zeros((NUM_INI_STATES*NOISE_DATA_PER_STATE*CONTROL_STEPS, 128, 7)).tolist()
-    x_ini_memory = np.zeros((1*CONTROL_STEPS, 5)) # 1*200, 20 (q q_dot x x_dot) np.zeros((NUM_INI_STATES*1*CONTROL_STEPS, 20)).tolist()
-    # x_random_memory = np.zeros((NOISE_DATA_PER_STATE*CONTROL_STEPS, 20)) # 20*200, 20 (q q_dot x x_dot) np.zeros((NUM_INI_STATES*NOISE_DATA_PER_STATE*CONTROL_STEPS, 20)).tolist()
-    j_ini_memory = np.zeros((1*CONTROL_STEPS, 1)) # 1*200, 1 np.zeros((NUM_INI_STATES*1*CONTROL_STEPS, 1)).tolist()
-    # j_random_memory = np.zeros((NOISE_DATA_PER_STATE*CONTROL_STEPS, 1)) # 20*200, 1 np.zeros((NUM_INI_STATES*NOISE_DATA_PER_STATE*CONTROL_STEPS, 1)).tolist()
+    u_ini_memory = np.zeros((1*CONTROL_STEPS, HOR, 1)) 
+    u_random_memory = np.zeros((NUM_NOISY_DATA*CONTROL_STEPS, HOR, 1))
+    x_ini_memory = np.zeros((1*CONTROL_STEPS, 5)) 
+    x_random_memory = np.zeros((NUM_NOISY_DATA*CONTROL_STEPS, 5)) 
+    j_ini_memory = np.zeros((1*CONTROL_STEPS, 1)) 
+    j_random_memory = np.zeros((NUM_NOISY_DATA*CONTROL_STEPS, 1)) 
 
     # initial data groups 50
     argument_each_group = []
@@ -469,7 +524,7 @@ def main():
             x0 = np.array([x_0, 0.0, theta_0, 0, theta_red_0])
             
             argument_each_group.append((x_ini_guess, u_ini_guess, idx_group_of_control_step, x0, 
-                                        u_ini_memory, x_ini_memory, j_ini_memory))
+                                        u_ini_memory, x_ini_memory, j_ini_memory, u_random_memory, x_random_memory, j_random_memory))
         
 
     # test_data_group = initial_data_groups[0:2]
