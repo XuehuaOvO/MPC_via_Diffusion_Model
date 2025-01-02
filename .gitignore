@@ -184,3 +184,6 @@ deps/isaac-gym-preview-4
 /model_performance_saving/
 /trained_models/
 /nn_trained_models/
+/scripts/Panda/xml/
+/training_data_collecting/
+/cart pole nmpc/
