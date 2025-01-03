@@ -13,20 +13,20 @@ from torch_robotics.torch_utils.seed import fix_random_seed
 from torch_robotics.torch_utils.torch_utils import get_torch_device
 
 ########## Setting ############
-STATE_DIM = 4
+STATE_DIM = 5
 BATCH_SIZE = 512
-HORIZON = 64
+HORIZON = 32
 
-DATASET_SUBDIR = 'diff_mpc_2024/5_6_noise_3'
+DATASET_SUBDIR = 'CartPole-NMPC' # 'diff_mpc_2024/5_6_noise_3'
 
-MODEL_SAVED_DIRECTORY = 'logs/nn_30' # under the train_diffusion folder
-EXTRA_MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nn_30'
+MODEL_SAVED_DIRECTORY = 'logs/nn_cart_test1' # under the train_diffusion folder
+EXTRA_MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nn_cart_pole_test1'
 
 # training data range (for get_specified_dataset)
-NORMAL_POS_RANGE = range(0,16000)
-NORMAL_NEG_RANGE = range(16000,32000)
-NOISY_POS_RANGE = range(32000,352000)
-NOISY_NEG_RANGE = range(352000,672000)
+# NORMAL_POS_RANGE = range(0,16000)
+# NORMAL_NEG_RANGE = range(16000,32000)
+# NOISY_POS_RANGE = range(32000,352000)
+# NOISY_NEG_RANGE = range(352000,672000)
 
 # NN Class
 class AMPCNet(nn.Module):
@@ -219,7 +219,7 @@ loss_fn = val_loss_fn = criterion = torch.nn.MSELoss()
 model.train()
 
 # Number of epochs (how many times to loop over the entire dataset)
-epochs = 300
+epochs = 500
 
 train_steps_current = 0
 
