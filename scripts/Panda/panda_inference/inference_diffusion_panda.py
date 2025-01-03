@@ -18,24 +18,29 @@ import casadi as ca
 
 # Trained Model Info
 TRAINED_MODELS_DIR = '../../trained_models/' # main loader of all saved trained models
-MODEL_FOLDER = 'panda_test4_113400 '  #'180000_training_data' # choose a folder in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
-MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/panda_test4_113400/final' #'/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/180000_training_data/100000' # the absolute path of the trained model
+MODEL_FOLDER = 'panda_test6_117600'  #'180000_training_data' # choose a folder in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
+MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/panda_test6_117600/final' #'/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/180000_training_data/100000' # the absolute path of the trained model
 MODEL_ID = 'final' # number of training
-RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/Panda_113400'
+RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/Panda_test6_performance' # '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/Panda_113400' 
 
 # Sampling data
-NUM_SEED = 42
+# NUM_SEED = 42
 WEIGHT_GUIDANC = 0.01 # non-conditioning weight
 HORIZON = 128
 TARGET_POS = np.array([0.3, 0.3, 0.5]).reshape(3, 1)
 SAMPLING_STEPS = 200
 CONTROL_RATE = 10
 
+Q = np.diag([10,10,10])
+R = 0.5
+P = np.diag([10,10,10])
+
 def main():
     # memory 
     x_pos_memory = np.zeros((SAMPLING_STEPS, 3)) 
     q_pos_memory = np.zeros((SAMPLING_STEPS, 7)) 
-    ctl_memory = np.zeros((SAMPLING_STEPS, 7)) 
+    ctl_memory = np.zeros((SAMPLING_STEPS, 7))
+    abs_dis_memory = np.zeros((SAMPLING_STEPS, 1))
 
     # load model path
     model_dir = MODEL_PATH 
@@ -63,6 +68,7 @@ def main():
 
     # Sampling initial data
     ini_joint_states = sampling_data_generating()
+    # ini_joint_states = np.array([[0, 0, 0, 0, 0, 0, 0]])
 
     # panda mujoco
     panda = mujoco.MjModel.from_xml_path('/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/Panda/xml/mjx_scene.xml')
@@ -101,6 +107,7 @@ def main():
             # data saving
             q_pos_memory[sampling_step,:] = q_current_pos.reshape(7)
             x_pos_memory[sampling_step,:] = x_current_pos.reshape(3)
+            abs_dis_memory[sampling_step,:] = np.linalg.norm(x_current_pos - TARGET_POS)
 
             # sampling
             inputs_normalized_iters = diffusion_sampling(x_current, dataset, model, n_support_points)
@@ -140,11 +147,15 @@ def main():
             q_last_pos, x_last_pos, context_last = state_loading(panda,data)
             print(f'final panda x pos -- {x_last_pos}')
         
+    
+    # final position difference
+    print(f'----------------------------------------------------')
+    print(f'fianl abs distance -- {abs_dis_memory[-1,0]}')
+    print(f'----------------------------------------------------')
 
 
-
-    # plot
-    joint_name = 'qPOS' + str(ini_joint_states[0,0]) + '_' +  str(ini_joint_states[0,1]) + '_' + str(ini_joint_states[0,2]) + '_' + str(ini_joint_states[0,3]) + '_' + str(ini_joint_states[0,4]) + '_' + str(ini_joint_states[0,5]) + '_' + str(ini_joint_states[0,6]) 
+    ########################## plot ##########################
+    joint_name = 'qPOS' + str(ini_joint_states[0,0]) + '_' +  str(ini_joint_states[0,1]) + '_' + str(ini_joint_states[0,2]) + '_' + str(ini_joint_states[0,3]) + '_' + str(ini_joint_states[0,4]) + '_' + str(ini_joint_states[0,5]) + '_' + str(ini_joint_states[0,6]) # + '_test8'
     figure_saving_path = os.path.join(RESULTS_SAVED_PATH, joint_name)
     os.makedirs(figure_saving_path, exist_ok=True)
 
@@ -199,6 +210,16 @@ def main():
     plt.legend()  
 
     figure_name = 'Ctrls trajectories' + '.png'
+    figure_path = os.path.join(figure_saving_path, figure_name)
+    plt.savefig(figure_path)  
+
+    ######## fig4 abs distance ########
+    plt.figure()
+    plt.plot(t, abs_dis_memory)
+    plt.xlabel("Time [s]")
+    plt.ylabel("absolute distance [m]")
+
+    figure_name = 'Absolute distance trajectory' + '.png'
     figure_path = os.path.join(figure_saving_path, figure_name)
     plt.savefig(figure_path)  
 
@@ -389,6 +410,31 @@ def diffusion_sampling(x_current, dataset, model, n_support_points):
     print(inputs_normalized_iters.size()) # 31 1 128 7
 
     return inputs_normalized_iters
+
+
+# diffusion cost
+def mpc_cost(predicted_states, predicted_controls, Q, R, P):
+    cost = 0
+
+    # initial cost
+    x_0 = predicted_states[:,0,0]
+    cost = Q[0,0]*(x_0[0]-TARGET_POS[0])**2 + Q[1,1]*(x_0[1]-TARGET_POS[1])**2 + Q[2,2]*(x_0[2]-TARGET_POS[2])**2
+
+    # stage cost
+    i = 0
+    for i in range(predicted_controls.shape[1]-1):
+        x_i = predicted_states[:,i+1,0]
+        u_i_1 = predicted_controls[:,i,0]
+        u_i = predicted_controls[:,i+1,0]
+        delta_u = u_i - u_i_1
+        # print(0.5*(ca.sumsqr(u_i)))
+        cost += Q[0,0]*(x_i[0]-TARGET_POS[0])**2 + Q[1,1]*(x_i[1]-TARGET_POS[1])**2 + Q[2,2]*(x_i[2]-TARGET_POS[2])**2 + R*(ca.sumsqr(delta_u))
+
+    # terminal cost
+    x_end = predicted_states[:,-1,0]
+    cost += P[0,0]*(x_end[0]-TARGET_POS[0])**2 + P[1,1]*(x_end[1]-TARGET_POS[1])**2 + P[2,2]*(x_end[2]-TARGET_POS[2])**2 # + 0.5*(ca.sumsqr(u_end-u_end_1))
+
+    return cost
 
 
 if __name__ == "__main__":

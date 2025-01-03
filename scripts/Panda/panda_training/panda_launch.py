@@ -14,7 +14,7 @@ os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 DATASET_SUBDIR = 'Panda-Data' # the folder of the training data files (location: /root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC)
 
 # training data amount
-TRAINING_DATA_AMOUNT = 113400
+TRAINING_DATA_AMOUNT = 117600 # test4,5: 113400
 
 # learning parameters
 BATCH_SIZE = 512 # 512
@@ -22,7 +22,7 @@ LEARNING_RATE = 3e-3
 
 EPOCHES = 500 # times that the whole data should be trained
 
-MODEL_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/panda_test4_113400'
+MODEL_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/panda_test6_117600'
 EXP_FILE = 'panda_train' # lead to the panda_train.py
 
 # LAUNCHER
