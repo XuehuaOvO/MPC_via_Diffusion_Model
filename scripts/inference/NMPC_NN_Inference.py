@@ -27,19 +27,19 @@ allow_ops_in_compiled_graph()
 
 
 TRAINED_MODELS_DIR = '../../nn_trained_models/' # '../../trained_models/' cart_pole_diffusion_based_on_MPD/nn_trained_models/nmpc_672000_training_data
-MODEL_FOLDER = 'nn_120000' # choose a main model folder saved in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
-MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nn_120000/final' # the absolute path of the trained model
+MODEL_FOLDER = 'nn_cart_pole_test1' # choose a main model folder saved in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
+MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nn_cart_pole_test1/final' # the absolute path of the trained model
 MODEL_ID = 'final' # number of training
 
-POSITION_INITIAL_RANGE = np.linspace(-0.5, 0.5,5) # np.linspace(-1,1,5) np.linspace(-0.5, 0.5,5) 
-THETA_INITIAL_RANGE = np.linspace(1.8, 4.4, 5) # np.linspace(-np.pi/4,np.pi/4,5) np.linspace(3*np.pi/4, 5*np.pi/4, 5) np.linspace(1.8, 4.4, 5)
+POSITION_INITIAL_RANGE = np.linspace(-5,5,5) 
+THETA_INITIAL_RANGE = np.linspace(3*np.pi/4,5*np.pi/4,5) # np.linspace(-np.pi/4,np.pi/4,5) np.linspace(3*np.pi/4, 5*np.pi/4, 5) np.linspace(1.8, 4.4, 5)
 WEIGHT_GUIDANC = 0.01 # non-conditioning weight
-X0_IDX = 24 # range:[0,199] 20*20 data 0
-ITERATIONS = 50 # control loop (steps) 50
-HORIZON = 64 # mpc horizon 8
+X0_IDX = 12 # range:[0,199] 20*20 data 0
+ITERATIONS = 80 # control loop (steps) 50
+HORIZON = 32 # mpc horizon 8
 
-RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/nn_120000/final'
-DATASET_SUBDIR = 'diff_mpc_2024' # 'diff_mpc_2024/5_6_noise_3'
+RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/nn_trained_models/nn_cart_pole_test1/final'
+DATASET_SUBDIR = 'CartPole-NMPC' # 'diff_mpc_2024/5_6_noise_3'
 
 # NN Model Class
 class AMPCNet_Inference(nn.Module):
@@ -81,6 +81,15 @@ PI_2 = 2*np.pi
 PI_UNDER_2 = 2/np.pi
 PI_UNDER_1 = 1/np.pi
 
+M_car = 4.5
+m_pole = 0.12
+l_pendul = 0.14
+k = 0.5
+c = 0.002
+I = (m_pole*l_pendul**2)/3
+v_1 = (M_car + m_pole)/(I*(M_car + m_pole) + (l_pendul**2)*m_pole*M_car)
+v_2 = (I + (l_pendul**2)*m_pole)/(I*(M_car + m_pole) + (l_pendul**2)*m_pole*M_car)
+
 def EulerForwardCartpole_virtual_Casadi(dynamic_update_virtual_Casadi, dt, x,u) -> ca.vertcat:
     xdot = dynamic_update_virtual_Casadi(x,u)
     return x + xdot * dt
@@ -90,18 +99,30 @@ def dynamic_update_virtual_Casadi(x, u) -> ca.vertcat:
     # Return the derivative of the state
     # u is 1x1 array, covert to scalar by u[0] 
         
+    # return ca.vertcat(
+    #     x[1],            # xdot 
+    #     ( MPLP * -np.sin(x[2]) * x[3]**2 
+    #       +MPG * np.sin(x[2]) * np.cos(x[2])
+    #       + u[0] 
+    #       )/(M_TOTAL - M_POLE*np.cos(x[2]))**2, # xddot
+
+    #     x[3],        # thetadot
+    #     ( -MPLP * np.sin(x[2]) * np.cos(x[2]) * x[3]**2
+    #       -MTG * np.sin(x[2])
+    #       -np.cos(x[2])*u[0]
+    #       )/(MTLP - MPLP*np.cos(x[2])**2),  # thetaddot
+        
+    #     -PI_UNDER_2 * (x[2]-np.pi) * x[3]   # theta_stat_dot
+    # )
+
     return ca.vertcat(
         x[1],            # xdot 
-        ( MPLP * -np.sin(x[2]) * x[3]**2 
-          +MPG * np.sin(x[2]) * np.cos(x[2])
-          + u[0] 
-          )/(M_TOTAL - M_POLE*np.cos(x[2]))**2, # xddot
+
+        -k*v_2*x[1] + ((l_pendul*m_pole)**2)*G*v_2*x[2]/(I + (l_pendul**2)*m_pole) - l_pendul*m_pole*c*v_2*x[3]/(I + (l_pendul**2)*m_pole) + v_2*u[0], #xddot
 
         x[3],        # thetadot
-        ( -MPLP * np.sin(x[2]) * np.cos(x[2]) * x[3]**2
-          -MTG * np.sin(x[2])
-          -np.cos(x[2])*u[0]
-          )/(MTLP - MPLP*np.cos(x[2])**2),  # thetaddot
+
+        -l_pendul*m_pole*k*v_1/(M_car+m_pole)*x[1] + l_pendul*m_pole*G*v_1*x[2] - c*v_1*x[3] + l_pendul*m_pole*v_1/(M_car+m_pole)*u[0], # thetaddot
         
         -PI_UNDER_2 * (x[2]-np.pi) * x[3]   # theta_stat_dot
     )
@@ -171,7 +192,20 @@ def EulerForwardCartpole_virtual(dt, x,u) -> ca.vertcat:
         
         -PI_UNDER_2 * (x[2]-np.pi) * x[3]   # theta_stat_dot
     ])
-    return x + xdot * dt
+
+    xdot_new = np.array([
+        x[1],            # xdot 
+        
+        -k*v_2*x[1] + ((l_pendul*m_pole)**2)*G*v_2/(I + (l_pendul**2)*m_pole)*x[2] - l_pendul*m_pole*c*v_2/(I + (l_pendul**2)*m_pole)*x[3] + v_2*u, #xddot
+
+        x[3],        # thetadot
+
+        -l_pendul*m_pole*k*v_1/(M_car+m_pole)*x[1] + l_pendul*m_pole*G*v_1*x[2] - c*v_1*x[3] + l_pendul*m_pole*v_1/(M_car+m_pole)*u, # thetaddot
+        
+        -PI_UNDER_2 * (x[2]-np.pi) * x[3]   # theta_stat_dot
+    ])
+
+    return x + xdot_new* dt
 
 
 def ThetaToRedTheta(theta):
@@ -230,9 +264,9 @@ opts_setting = {'ipopt.max_iter':20000, 'ipopt.acceptable_tol':1e-8, 'ipopt.acce
 NUM_STATE = 5
 Q_REDUNDANT = 1000.0
 P_REDUNDANT = 1000.0
-Q = np.diag([0.01, 0.01, 0, 0.01, Q_REDUNDANT]) #Q = np.diag([0.01, 0.01, Q_REDUNDANT, 0.01])
-R = 0.001
-P = np.diag([0.01, 0.1, 0, 0.1, P_REDUNDANT]) #P = np.diag([0.01, 0.1, P_REDUNDANT, 0.1])
+Q = np.diag([0.01, 0.01, 0, 0.001, Q_REDUNDANT])
+R = 0.1
+P = np.diag([0.01, 0.01, 0, 0.001, P_REDUNDANT]) #P = np.diag([0.01, 0.1, P_REDUNDANT, 0.1])
 
 
 TS = 0.01
@@ -245,8 +279,8 @@ IDX_THETA_RED = 4
 
 # initial guess
 INITIAL_GUESS_NUM = 2
-initial_guess_x = [5, -5] # [5, 0]
-initial_guess_u = [1000, -200] # [1000, -10000]
+initial_guess_x = [10, -10]
+initial_guess_u = [1000, -1000]
 
 
 
@@ -345,20 +379,20 @@ def experiment(
 
     for i in range(0, num_loop):
         x0_NN_transform = np.copy(x0)
-        x0_NN_transform[2] = x0_NN_transform[4]
-        x0_NN = x0_NN_transform[:4] 
+        # x0_NN_transform[2] = x0_NN_transform[4]
+        x0_NN = x0_NN_transform
 
         print(f'x0_NN  -- {x0_NN}')
         x0_NN  = torch.tensor(x0_NN).to(device) # load data to cuda
 
-        context = dataset.normalize_condition(x0_NN)
+        context = dataset.normalize_condition(x0_NN.reshape(1,NUM_STATE))
         
         nn_input = context
 
         #########################################################################
 
         # load prior nn model
-        input_size = NUM_STATE-1    # Define your input size based on your problem
+        input_size = NUM_STATE   # Define your input size based on your problem
         output_size = HORIZON    # Define your output size based on your problem (e.g., regression or single class prediction)
         model = AMPCNet_Inference(input_size, output_size)
 
@@ -535,9 +569,9 @@ def experiment(
 
     ########################## Diffusion & MPC States Results Saving ################################
     # save diffusion states along horizon
-    diffusion_states = 'x_diffusion_horizon.npy'
-    diffusion_states_path = os.path.join(results_folder, diffusion_states)
-    np.save(diffusion_states_path, x_horizon_track)
+    # diffusion_states = 'x_diffusion_horizon.npy'
+    # diffusion_states_path = os.path.join(results_folder, diffusion_states)
+    # np.save(diffusion_states_path, x_horizon_track)
 
 
     ########################## plot ################################
@@ -601,9 +635,10 @@ def experiment(
 
     # plt.show()
     # save figure 
-    figure_name = 'NMPC_NN_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '.png'
+    figure_name = 'NN_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_inirange_test3' '.png'
     figure_path = os.path.join(results_dir, figure_name)
     plt.savefig(figure_path)
+    plt.show()
 
     ######### Performance Check #########
     # position_difference = np.sum(np.abs(x_track[0, :] - x_nmpc_track[0, :]))
