@@ -15,16 +15,16 @@ MAX_CORE_CPU = 25
 
 # data saving folder
 SAVE_PATH =  "/MPC_DynamicSys/sharedVol/train_data/nmpc/multi_normal"
-FOLDER_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data_collecting/nmpc_cart_pole_collecting'
+FOLDER_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data_collecting/nmpc_cart_pole_collecting/cartpole_plots' # '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data_collecting/nmpc_cart_pole_collecting'
 
 # control steps
 CONTROL_STEPS = 80
 
 # data range
-NUM_INITIAL_X = 5
+NUM_INITIAL_X = 2
 POSITION_INITIAL_RANGE = np.linspace(-5,5,NUM_INITIAL_X) 
 
-NUM_INIYIAL_THETA = 5
+NUM_INIYIAL_THETA = 2
 THETA_INITIAL_RANGE = np.linspace(3*np.pi/4,5*np.pi/4,NUM_INIYIAL_THETA) 
 
 # number of noisy data for each state
@@ -79,9 +79,9 @@ TS = 0.01
 rng_x = POSITION_INITIAL_RANGE 
 rng_theta = THETA_INITIAL_RANGE 
 rng0 = []
-for idx_noisy in rng_x:
+for idx in rng_x:
     for n in rng_theta:
-        rng0.append([idx_noisy,n])
+        rng0.append([idx,n])
 rng0 = np.array(rng0)
 num_datagroup = len(rng0)
 print(f'rng0 -- {rng0.shape}')
@@ -332,9 +332,9 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         torch_j_ini_memory_tensor = torch.Tensor(j_ini_memory)
         torch_j_random_memory_tensor = torch.Tensor(j_random_memory)
 
-        torch.save(torch_u_ini_memory_tensor, os.path.join(FOLDER_PATH , f'pure_u_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
-        torch.save(torch_x_ini_memory_tensor , os.path.join(FOLDER_PATH , f'pure_x_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
-        torch.save(torch_j_ini_memory_tensor, os.path.join(FOLDER_PATH , f'pure_j_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        # torch.save(torch_u_ini_memory_tensor, os.path.join(FOLDER_PATH , f'pure_u_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        # torch.save(torch_x_ini_memory_tensor , os.path.join(FOLDER_PATH , f'pure_x_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        # torch.save(torch_j_ini_memory_tensor, os.path.join(FOLDER_PATH , f'pure_j_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
         
         # cat
         u_data = torch.cat((torch_u_ini_memory_tensor, torch_u_random_memory_tensor), dim=0)
@@ -346,9 +346,9 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         print(f'j_size -- {j_data.size()}')
 
         # save data in PT file for training
-        torch.save(u_data, os.path.join(FOLDER_PATH , f'u_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
-        torch.save(x_data, os.path.join(FOLDER_PATH , f'x_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
-        torch.save(j_data, os.path.join(FOLDER_PATH , f'j_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        # torch.save(u_data, os.path.join(FOLDER_PATH , f'u_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        # torch.save(x_data, os.path.join(FOLDER_PATH , f'x_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        # torch.save(j_data, os.path.join(FOLDER_PATH , f'j_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
 
         # plots
         t = np.arange(0, CONTROL_STEPS*TS, TS) # np.arange(len(joint_states[1])) * panda.opt.timestep
@@ -356,33 +356,39 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
 
         # plot 1: 5 states
         plt.figure()
-        for i in range(5):
-                plt.plot(t, x_ini_memory[:,i], label=f"State {i+1}")
+        # for i in range(5):
+        plt.plot(t, x_ini_memory[:,0], label=f"x")
+        plt.plot(t, x_ini_memory[:,1], label=f"x_dot")
+        plt.plot(t, x_ini_memory[:,2], label=f"theta")
+        plt.plot(t, x_ini_memory[:,3], label=f"theta_dot")
+        plt.plot(t, x_ini_memory[:,4], label=f"theta_star")
         for z in range(CONTROL_STEPS):
                 for i in range(5):
                     noisy_state_each_ctl_step = x_random_memory[z*NUM_NOISY_DATA:z*NUM_NOISY_DATA+NUM_NOISY_DATA,i]
                     for k in range(0,NUM_NOISY_DATA):
-                            plt.scatter(t[z], noisy_state_each_ctl_step[k], color = 'blue')
+                            plt.scatter(t[z], noisy_state_each_ctl_step[k], s = 20, color = 'lightgrey')
+        plt.scatter(t[CONTROL_STEPS-1], noisy_state_each_ctl_step[0], s = 20, color = 'lightgrey', label=f"noise")
                 
         plt.xlabel("Time [s]")
-        plt.ylabel("states")
+        plt.ylabel("state")
         plt.legend()
-        figure_name = 'idx-' + str(idx_group_of_control_step) + '_x' + '.png'
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_x' + '.pdf'
         figure_path = os.path.join(FOLDER_PATH, figure_name)
         plt.savefig(figure_path)
 
         # plot 2: u
         plt.figure()
-        plt.plot(t, u_ini_memory[:,0,0])
+        plt.plot(t, u_ini_memory[:,0,0], label=f"u")
         for z in range(CONTROL_STEPS):
                 noisy_u_each_ctl_step = u_random_memory[z*NUM_NOISY_DATA:z*NUM_NOISY_DATA+NUM_NOISY_DATA,0,0]
                 for k in range(0, NUM_NOISY_DATA):
-                    plt.scatter(t[z], noisy_u_each_ctl_step[k], color = 'blue')
+                    plt.scatter(t[z], noisy_u_each_ctl_step[k], s = 20, color = 'lightgrey')
+        plt.scatter(t[CONTROL_STEPS-1], noisy_u_each_ctl_step[0], s = 20, color = 'lightgrey', label=f"noise")
                 
         plt.xlabel("Time [s]")
         plt.ylabel("control input")
         plt.legend()
-        figure_name = 'idx-' + str(idx_group_of_control_step) + '_u' + '.png'
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_u' + '.pdf'
         figure_path = os.path.join(FOLDER_PATH, figure_name)
         plt.savefig(figure_path)
 
@@ -392,12 +398,13 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         for z in range(CONTROL_STEPS):
                 noisy_j_each_ctl_step = j_random_memory[z*NUM_NOISY_DATA:z*NUM_NOISY_DATA+NUM_NOISY_DATA,0]
                 for k in range(0, NUM_NOISY_DATA):
-                    plt.scatter(t[z], noisy_j_each_ctl_step[k], color = 'blue')
+                    plt.scatter(t[z], noisy_j_each_ctl_step[k], s = 20, color = 'lightgrey')
+        plt.scatter(t[CONTROL_STEPS-1], noisy_j_each_ctl_step[0], s = 20, color = 'lightgrey', label=f"noise")
                 
         plt.xlabel("Time [s]")
         plt.ylabel("cost")
         plt.legend()
-        figure_name = 'idx-' + str(idx_group_of_control_step) + '_j' + '.png'
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_j' + '.pdf'
         figure_path = os.path.join(FOLDER_PATH, figure_name)
         plt.savefig(figure_path)
 
