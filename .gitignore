@@ -187,3 +187,4 @@ deps/isaac-gym-preview-4
 /scripts/Panda/xml/
 /training_data_collecting/
 /cart pole nmpc/
+/figures/
