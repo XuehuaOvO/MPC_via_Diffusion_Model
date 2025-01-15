@@ -52,6 +52,9 @@ initial_guess_u = [1000, -1000]
 
 RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/cart_pole_test1_84000'
 
+# sampling time
+SAMPLING_TIMES = 10
+
 # lmpc cart pole dynamics
 def cart_pole_dynamics(x, u):
     A = np.array([
@@ -348,6 +351,7 @@ def experiment(
 
     #################################################################
     # load initial starting state x0
+     # for times in range(0,SAMPLING_TIMES): 
     rng_x = POSITION_INITIAL_RANGE # 20 x_0 samples
     rng_theta = THETA_INITIAL_RANGE # 20 theta_0 samples
     
@@ -355,7 +359,7 @@ def experiment(
     rng0 = []
     for m in rng_x:
         for n in rng_theta:
-           rng0.append([m,n])
+            rng0.append([m,n])
     rng0 = np.array(rng0,dtype=float)
 
     # one initial state for test
@@ -374,12 +378,13 @@ def experiment(
     ############################################################################
     # sampling loop
     num_loop = ITERATIONS
-    x_track = np.zeros((NUM_STATE, num_loop+1))
-    u_track = np.zeros((1, num_loop))
+    x_track = np.zeros((SAMPLING_TIMES, NUM_STATE, num_loop+1))
+    u_track = np.zeros((SAMPLING_TIMES, 1, num_loop))
     u_horizon_track = np.zeros((num_loop, HORIZON))
     x_horizon_track = np.zeros((num_loop, HORIZON+1, NUM_STATE))
 
-    x_track[:,0] = x0
+    for times in range(0, SAMPLING_TIMES): 
+        x_track[times,:,0] = x0
     x_updated_by_u = np.zeros((HORIZON+1, NUM_STATE))
 
     # time recording 
@@ -387,126 +392,129 @@ def experiment(
     MPC_total_time = 0
 
     # cost array
-    cost_D = np.zeros((1, ITERATIONS+1))
+    cost_D = np.zeros((SAMPLING_TIMES, 1, ITERATIONS+1))
     cost_NMPC_pos = np.zeros((1, ITERATIONS+1))
     cost_NMPC_neg = np.zeros((1, ITERATIONS+1))
 
     # initial cost calculating
     cost_initial = Q[0,0]*x0[0]**2 + Q[1,1]*x0[1]**2 + Q[2,2]*x0[2]**2 + Q[3,3]*x0[3]**2 + Q[4,4]*x0[4]**2
-    cost_D[0,0] = cost_initial
+    cost_D[:,0,0] = cost_initial
     cost_NMPC_pos[0,0] = cost_initial
     cost_NMPC_neg[0,0] = cost_initial
 
-    for i in range(0, num_loop):
-        x0_D= np.copy(x0)
-        x0_D = torch.tensor(x0_D).to(device) # load data to cuda
+    for times in range(SAMPLING_TIMES): 
+        x0 = initial_state
+        for i in range(0, num_loop):
+            print(f'sampling, ctl -- {times, i}')
+            x0_D= np.copy(x0)
+            x0_D = torch.tensor(x0_D).to(device) # load data to cuda
 
-        hard_conds = None
-        context = dataset.normalize_condition(x0_D.reshape(1,NUM_STATE))
-        context_weight = WEIGHT_GUIDANC
+            hard_conds = None
+            context = dataset.normalize_condition(x0_D.reshape(1,NUM_STATE))
+            context_weight = WEIGHT_GUIDANC
 
-        #########################################################################
-        # Load prior model
-        diffusion_configs = dict(
-            variance_schedule=args['variance_schedule'],
-            n_diffusion_steps=args['n_diffusion_steps'],
-            predict_epsilon=args['predict_epsilon'],
-        )
-        unet_configs = dict(
-            state_dim=dataset.state_dim,
-            n_support_points=dataset.n_support_points,
-            unet_input_dim=args['unet_input_dim'],
-            dim_mults=UNET_DIM_MULTS[args['unet_dim_mults_option']],
-        )
-        diffusion_model = get_model(
-            model_class=args['diffusion_model_class'],
-            model=ConditionedTemporalUnet(**unet_configs),
-            tensor_args=tensor_args,
-            **diffusion_configs,
-            **unet_configs
-        )
-        # 'ema_model_current_state_dict.pth'
-        diffusion_model.load_state_dict(
-            torch.load(os.path.join(model_dir, 'checkpoints', 'ema_model_current_state_dict.pth' if args['use_ema'] else 'model_current_state_dict.pth'),
-            map_location=tensor_args['device'])
-        )
-        diffusion_model.eval()
-        model = diffusion_model
-
-        model = torch.compile(model)
-
-
-        ########
-        # Sample u with classifier-free-guidance (CFG) diffusion model
-        with TimerCUDA() as t_diffusion_time:
-            inputs_normalized_iters = model.run_CFG(
-                context, hard_conds, context_weight,
-                n_samples=n_samples, horizon=n_support_points,
-                return_chain=True,
-                sample_fn=ddpm_cart_pole_sample_fn,
-                n_diffusion_steps_without_noise=n_diffusion_steps_without_noise,
+            #########################################################################
+            # Load prior model
+            diffusion_configs = dict(
+                variance_schedule=args['variance_schedule'],
+                n_diffusion_steps=args['n_diffusion_steps'],
+                predict_epsilon=args['predict_epsilon'],
             )
-        print(f't_model_sampling: {t_diffusion_time.elapsed:.4f} sec')
-        single_Diffusion_time = np.round(t_diffusion_time.elapsed,4)
-        Diffusion_total_time += single_Diffusion_time
-        # t_total = timer_model_sampling.elapsed
+            unet_configs = dict(
+                state_dim=dataset.state_dim,
+                n_support_points=dataset.n_support_points,
+                unet_input_dim=args['unet_input_dim'],
+                dim_mults=UNET_DIM_MULTS[args['unet_dim_mults_option']],
+            )
+            diffusion_model = get_model(
+                model_class=args['diffusion_model_class'],
+                model=ConditionedTemporalUnet(**unet_configs),
+                tensor_args=tensor_args,
+                **diffusion_configs,
+                **unet_configs
+            )
+            # 'ema_model_current_state_dict.pth'
+            diffusion_model.load_state_dict(
+                torch.load(os.path.join(model_dir, 'checkpoints', 'ema_model_current_state_dict.pth' if args['use_ema'] else 'model_current_state_dict.pth'),
+                map_location=tensor_args['device'])
+            )
+            diffusion_model.eval()
+            model = diffusion_model
 
-        ########
-        inputs_iters = dataset.unnormalize_states(inputs_normalized_iters)
+            model = torch.compile(model)
 
-        inputs_final = inputs_iters[-1]
-        print(f'control_inputs -- {inputs_final}')
 
-        print(f'\n--------------------------------------\n')
-        
-        # x0 = x0.cpu() # copy cuda tensor at first to cpu
-        # x0_array = np.squeeze(x0.numpy()) # matrix (1*4) to vector (4)
-        horizon_inputs = np.zeros((1, HORIZON))
-        inputs_final = inputs_final.cpu()
-        for n in range(0,HORIZON):
-            horizon_inputs[0,n] = round(inputs_final[0,n,0].item(),4)
-        print(f'horizon_inputs -- {horizon_inputs}')
-        applied_input = round(inputs_final[0,0,0].item(),4) # retain 4 decimal places
-        print(f'applied_input -- {applied_input}')
+            ########
+            # Sample u with classifier-free-guidance (CFG) diffusion model
+            with TimerCUDA() as t_diffusion_time:
+                inputs_normalized_iters = model.run_CFG(
+                    context, hard_conds, context_weight,
+                    n_samples=n_samples, horizon=n_support_points,
+                    return_chain=True,
+                    sample_fn=ddpm_cart_pole_sample_fn,
+                    n_diffusion_steps_without_noise=n_diffusion_steps_without_noise,
+                )
+            print(f't_model_sampling: {t_diffusion_time.elapsed:.4f} sec')
+            single_Diffusion_time = np.round(t_diffusion_time.elapsed,4)
+            Diffusion_total_time += single_Diffusion_time
+            # t_total = timer_model_sampling.elapsed
 
-        # save the control input from diffusion sampling
-        u_track[:,i] = applied_input
-        u_horizon_track[i,:] = horizon_inputs
+            ########
+            inputs_iters = dataset.unnormalize_states(inputs_normalized_iters)
 
-        # cost of one step
-        cost_D[0,i+1] = calMPCCost(Q,R,P,inputs_final,x0, EulerForwardCartpole_virtual, TS)
+            inputs_final = inputs_iters[-1]
+            # print(f'control_inputs -- {inputs_final}')
 
-        # update states along the horizon
-        # x_updated_by_u[0,:] = x0
-        # x0_horizon = np.squeeze(x0.numpy())
-        # for z in range(0,horizon_inputs.shape[1]):
-        #     x_horizon_update = cart_pole_dynamics(x0_horizon, horizon_inputs[0,z])
-        #     x_updated_by_u[z+1,:] = x_horizon_update.T
-        #     x0_horizon = x_horizon_update
-        # x_horizon_track[i,:,:] = np.round(x_updated_by_u, decimals=4)
+            print(f'\n--------------------------------------\n')
+            
+            # x0 = x0.cpu() # copy cuda tensor at first to cpu
+            # x0_array = np.squeeze(x0.numpy()) # matrix (1*4) to vector (4)
+            horizon_inputs = np.zeros((1, HORIZON))
+            inputs_final = inputs_final.cpu()
+            for n in range(0,HORIZON):
+                horizon_inputs[0,n] = round(inputs_final[0,n,0].item(),4)
+            # print(f'horizon_inputs -- {horizon_inputs}')
+            applied_input = round(inputs_final[0,0,0].item(),4) # retain 4 decimal places
+            print(f'applied_input -- {applied_input}')
 
-        # update cart pole state
-        x_next = EulerForwardCartpole_virtual(TS,x0,applied_input)
-        print(f'x_next-- {x_next}')
-        x0 = np.array(x_next)
-        x0 = x0.T # transpose matrix
+            # save the control input from diffusion sampling
+            u_track[times,:,i] = applied_input
+            # u_horizon_track[i,:] = horizon_inputs
 
-        # save the new state
-        x_track[:,i+1] = x0
+            # cost of one step
+            cost_D[times,0,i+1] = calMPCCost(Q,R,P,inputs_final,x0, EulerForwardCartpole_virtual, TS)
 
-        #  x_updated_by_u = np.zeros((HORIZON+1, 4))
-        x_updated_by_u[0,:] = x0
-        
-        x0 = x0.T
-        # save new starting state along the horizon
-        # x_updated_by_u = np.zeros((HORIZON+1, 4))
-        # x_updated_by_u[0,:] = x0
+            # update states along the horizon
+            # x_updated_by_u[0,:] = x0
+            # x0_horizon = np.squeeze(x0.numpy())
+            # for z in range(0,horizon_inputs.shape[1]):
+            #     x_horizon_update = cart_pole_dynamics(x0_horizon, horizon_inputs[0,z])
+            #     x_updated_by_u[z+1,:] = x_horizon_update.T
+            #     x0_horizon = x_horizon_update
+            # x_horizon_track[i,:,:] = np.round(x_updated_by_u, decimals=4)
+
+            # update cart pole state
+            x_next = EulerForwardCartpole_virtual(TS,x0,applied_input)
+            print(f'x_next-- {x_next}')
+            x0 = np.array(x_next)
+            x0 = x0.T # transpose matrix
+
+            # save the new state
+            x_track[times,:,i+1] = x0
+
+            #  x_updated_by_u = np.zeros((HORIZON+1, 4))
+            x_updated_by_u[0,:] = x0
+            
+            x0 = x0.T
+            # save new starting state along the horizon
+            # x_updated_by_u = np.zeros((HORIZON+1, 4))
+            # x_updated_by_u[0,:] = x0
 
 
 
     # print all x and u 
-    print(f'x_track-- {x_track.T}')
-    print(f'u_track-- {u_track}')
+    # print(f'x_track-- {x_track.size()}')
+    # print(f'u_track-- {u_track.size()}')
  #-------------------------- Sampling finished --------------------------------
 
 
@@ -633,63 +641,76 @@ def experiment(
     step = np.linspace(0,num_i,num_i+1)
     step_u = np.linspace(0,num_i-1,num_i)
 
-    plt.figure(figsize=(12,10))
+    plt.figure(figsize=(10,14))
 
-    plt.subplot(7, 1, 1)
-    plt.plot(step, x_track[0, :])
-    plt.plot(step, x_nmpc_track[0, 0:ITERATIONS+1])
-    plt.plot(step, x_nmpc_track[0, ITERATIONS+1:])
-    plt.legend(['Diffusion Sampling', 'NMPC_pos', 'NMPC_neg']) 
+    plt.subplot(6, 1, 1)
+    plt.plot(step, x_nmpc_track[0, 0:ITERATIONS+1],label=f'NMPC (pos guess)',linewidth=7, color = 'gold')
+    plt.plot(step, x_nmpc_track[0, ITERATIONS+1:],label=f'NMPC (neg guess)', linewidth=7, color = 'lightpink')
+    for i in range(0, SAMPLING_TIMES):
+        plt.plot(step, x_track[i, 0, :], color='deepskyblue')
+    plt.plot(step, x_track[0, 0, :], label=f"Diffusion", color='deepskyblue')
+    plt.legend() 
+    # plt.legend(['Diffusion Sampling', 'NMPC_pos', 'NMPC_neg']) 
     plt.ylabel('Position (m)')
     plt.grid()
 
-    plt.subplot(7, 1, 2)
-    plt.plot(step, x_track[1, :])
-    plt.plot(step, x_nmpc_track[1, 0:ITERATIONS+1])
-    plt.plot(step, x_nmpc_track[1, ITERATIONS+1:])
+    plt.subplot(6, 1, 2)
+    plt.plot(step, x_nmpc_track[1, 0:ITERATIONS+1],linewidth=7, color = 'gold')
+    plt.plot(step, x_nmpc_track[1, ITERATIONS+1:],linewidth=7, color = 'lightpink')
+    for i in range(0, SAMPLING_TIMES):
+        plt.plot(step, x_track[i, 1, :], color='deepskyblue')
+    # plt.plot(step, x_track[1, :])
     plt.ylabel('Velocity (m/s)')
     plt.grid()
 
-    plt.subplot(7, 1, 3)
-    plt.plot(step, x_track[2, :])
-    plt.plot(step, x_nmpc_track[2, 0:ITERATIONS+1])
-    plt.plot(step, x_nmpc_track[2, ITERATIONS+1:])
+    plt.subplot(6, 1, 3)
+    plt.plot(step, x_nmpc_track[2, 0:ITERATIONS+1],linewidth=7, color = 'gold')
+    plt.plot(step, x_nmpc_track[2, ITERATIONS+1:],linewidth=7, color = 'lightpink')
+    for i in range(0,SAMPLING_TIMES):
+        plt.plot(step, x_track[i, 2, :], color='deepskyblue')
+    # plt.plot(step, x_track[2, :])
     plt.ylabel('Theta (rad)')
     plt.grid()
 
-    plt.subplot(7, 1, 4)
-    plt.plot(step, x_track[3, :])
-    plt.plot(step, x_nmpc_track[3, 0:ITERATIONS+1])
-    plt.plot(step, x_nmpc_track[3, ITERATIONS+1:])
+    plt.subplot(6, 1, 4)
+    plt.plot(step, x_nmpc_track[3, 0:ITERATIONS+1],linewidth=7, color = 'gold')
+    plt.plot(step, x_nmpc_track[3, ITERATIONS+1:],linewidth=7, color = 'lightpink')
+    for i in range(0, SAMPLING_TIMES):
+        plt.plot(step, x_track[i, 3, :], color='deepskyblue')
+    # plt.plot(step, x_track[3, :])
     plt.ylabel('Theta Dot (rad/s)')
     plt.grid()
 
-    plt.subplot(7, 1, 5)
-    plt.plot(step, x_track[4, :])
-    plt.plot(step, x_nmpc_track[4, 0:ITERATIONS+1])
-    plt.plot(step, x_nmpc_track[4, ITERATIONS+1:])
+    plt.subplot(6, 1, 5)
+    plt.plot(step, x_nmpc_track[4, 0:ITERATIONS+1],linewidth=7, color = 'gold')
+    plt.plot(step, x_nmpc_track[4, ITERATIONS+1:],linewidth=7, color = 'lightpink')
+    for i in range(0, SAMPLING_TIMES):
+        plt.plot(step, x_track[i, 4, :], color='deepskyblue')
+    # plt.plot(step, x_track[4, :])
     plt.ylabel('Theta Star (rad/s)')
     plt.grid()
 
-    plt.subplot(7, 1, 6)
-    plt.plot(step_u, u_track.reshape(num_loop,)) 
-    plt.plot(step_u, u_nmpc_track[0,:]) # u_nmpc_track.reshape(num_loop,)
-    plt.plot(step_u, u_nmpc_track[1,:])
+    plt.subplot(6, 1, 6)
+    plt.plot(step_u, u_nmpc_track[0,:],linewidth=7, color = 'gold') # u_nmpc_track.reshape(num_loop,)
+    plt.plot(step_u, u_nmpc_track[1,:],linewidth=7, color = 'lightpink')
+    for i in range(0,SAMPLING_TIMES):
+        plt.plot(step_u, u_track[i, 0, :], color='deepskyblue')
+    # plt.plot(step_u, u_track.reshape(num_loop,)) 
     plt.ylabel('Ctl Input (N)')
-    # plt.xlabel('Control Step')
-    plt.grid()
-
-    plt.subplot(7, 1, 7)
-    plt.plot(step, cost_D.reshape(ITERATIONS+1,)) 
-    plt.plot(step, cost_NMPC_pos.reshape(ITERATIONS+1,)) 
-    plt.plot(step, cost_NMPC_neg.reshape(ITERATIONS+1,))
-    plt.ylabel('Cost')
     plt.xlabel('Control Step')
     plt.grid()
 
+    # plt.subplot(7, 1, 7)
+    # plt.plot(step, cost_D.reshape(ITERATIONS+1,)) 
+    # plt.plot(step, cost_NMPC_pos.reshape(ITERATIONS+1,)) 
+    # plt.plot(step, cost_NMPC_neg.reshape(ITERATIONS+1,))
+    # plt.ylabel('Cost')
+    # plt.xlabel('Control Step')
+    # plt.grid()
+
     # plt.show()
     # save figure 
-    figure_name = 'Diffusion_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_inirange_test5_' + '.png'
+    figure_name = 'Diffusion_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_diffusion_update_plot_' + '.pdf'
     figure_path = os.path.join(results_dir, figure_name)
     plt.savefig(figure_path)
     plt.show()
