@@ -392,9 +392,9 @@ def experiment(
     MPC_total_time = 0
 
     # cost array
-    cost_D = np.zeros((SAMPLING_TIMES, 1, ITERATIONS+1))
-    cost_NMPC_pos = np.zeros((1, ITERATIONS+1))
-    cost_NMPC_neg = np.zeros((1, ITERATIONS+1))
+    cost_D = np.zeros((SAMPLING_TIMES, 1, ITERATIONS))
+    cost_NMPC_pos = np.zeros((1, ITERATIONS))
+    cost_NMPC_neg = np.zeros((1, ITERATIONS))
 
     # initial cost calculating
     cost_initial = Q[0,0]*x0[0]**2 + Q[1,1]*x0[1]**2 + Q[2,2]*x0[2]**2 + Q[3,3]*x0[3]**2 + Q[4,4]*x0[4]**2
@@ -482,7 +482,7 @@ def experiment(
             # u_horizon_track[i,:] = horizon_inputs
 
             # cost of one step
-            cost_D[times,0,i+1] = calMPCCost(Q,R,P,inputs_final,x0, EulerForwardCartpole_virtual, TS)
+            cost_D[times,0,i] = calMPCCost(Q,R,P,inputs_final,x0, EulerForwardCartpole_virtual, TS)
 
             # update states along the horizon
             # x_updated_by_u[0,:] = x0
@@ -567,12 +567,12 @@ def experiment(
                  #pos cost
                  u = torch.from_numpy(U_sol)
                  u = u.reshape(1,HORIZON,1)
-                 cost_NMPC_pos[0,i+1] = calMPCCost(Q,R,P,u,x0, EulerForwardCartpole_virtual, TS)
+                 cost_NMPC_pos[0,i] = calMPCCost(Q,R,P,u,x0, EulerForwardCartpole_virtual, TS)
              else:
                  # neg cost
                  u = torch.from_numpy(U_sol)
                  u = u.reshape(1,HORIZON,1)
-                 cost_NMPC_neg[0,i+1] = calMPCCost(Q,R,P,u,x0, EulerForwardCartpole_virtual, TS)
+                 cost_NMPC_neg[0,i] = calMPCCost(Q,R,P,u,x0, EulerForwardCartpole_virtual, TS)
 
              # x0 next 
              x0_next = EulerForwardCartpole_virtual(TS,x0,applied_u)
@@ -602,9 +602,21 @@ def experiment(
 
     print(f'x_nmpc_track-- {x_nmpc_track.shape}')
 
-    ########################## Diffusion & MPC Control Inputs Results Saving ################################
+    ########################## Counting ################################
 
-    results_folder = os.path.join(RESULTS_SAVED_PATH, 'model_'+ str(MODEL_ID), 'x0_'+ str(X0_IDX))
+    pos_gold_right = 0
+    neg_coral_left = 0
+    for times in range(SAMPLING_TIMES):
+        last_theta = x_track[times, 2, -1]
+        if last_theta > 3.14:
+            pos_gold_right = pos_gold_right + 1
+        else:
+            neg_coral_left = neg_coral_left + 1
+    
+    print(f'move toward right -- {pos_gold_right}')
+    print(f'move toward left -- {neg_coral_left}')
+
+    # results_folder = os.path.join(RESULTS_SAVED_PATH, 'model_'+ str(MODEL_ID), 'x0_'+ str(X0_IDX))
     # os.makedirs(results_folder, exist_ok=True)
     
     # # save the first u 
@@ -641,76 +653,78 @@ def experiment(
     step = np.linspace(0,num_i,num_i+1)
     step_u = np.linspace(0,num_i-1,num_i)
 
-    plt.figure(figsize=(10,14))
+    plt.figure(figsize=(10,16))
 
-    plt.subplot(6, 1, 1)
+    plt.subplot(7, 1, 1)
     plt.plot(step, x_nmpc_track[0, 0:ITERATIONS+1],label=f'NMPC (pos guess)',linewidth=7, color = 'gold')
     plt.plot(step, x_nmpc_track[0, ITERATIONS+1:],label=f'NMPC (neg guess)', linewidth=7, color = 'lightpink')
     for i in range(0, SAMPLING_TIMES):
-        plt.plot(step, x_track[i, 0, :], color='deepskyblue')
-    plt.plot(step, x_track[0, 0, :], label=f"Diffusion", color='deepskyblue')
+        plt.plot(step, x_track[i, 0, :], color='darkgreen')
+    plt.plot(step, x_track[0, 0, :], label=f"Diffusion", color='darkgreen')
     plt.legend() 
     # plt.legend(['Diffusion Sampling', 'NMPC_pos', 'NMPC_neg']) 
     plt.ylabel('Position (m)')
     plt.grid()
 
-    plt.subplot(6, 1, 2)
+    plt.subplot(7, 1, 2)
     plt.plot(step, x_nmpc_track[1, 0:ITERATIONS+1],linewidth=7, color = 'gold')
     plt.plot(step, x_nmpc_track[1, ITERATIONS+1:],linewidth=7, color = 'lightpink')
     for i in range(0, SAMPLING_TIMES):
-        plt.plot(step, x_track[i, 1, :], color='deepskyblue')
+        plt.plot(step, x_track[i, 1, :], color='darkgreen')
     # plt.plot(step, x_track[1, :])
     plt.ylabel('Velocity (m/s)')
     plt.grid()
 
-    plt.subplot(6, 1, 3)
+    plt.subplot(7, 1, 3)
     plt.plot(step, x_nmpc_track[2, 0:ITERATIONS+1],linewidth=7, color = 'gold')
     plt.plot(step, x_nmpc_track[2, ITERATIONS+1:],linewidth=7, color = 'lightpink')
     for i in range(0,SAMPLING_TIMES):
-        plt.plot(step, x_track[i, 2, :], color='deepskyblue')
+        plt.plot(step, x_track[i, 2, :], color='darkgreen')
     # plt.plot(step, x_track[2, :])
     plt.ylabel('Theta (rad)')
     plt.grid()
 
-    plt.subplot(6, 1, 4)
+    plt.subplot(7, 1, 4)
     plt.plot(step, x_nmpc_track[3, 0:ITERATIONS+1],linewidth=7, color = 'gold')
     plt.plot(step, x_nmpc_track[3, ITERATIONS+1:],linewidth=7, color = 'lightpink')
     for i in range(0, SAMPLING_TIMES):
-        plt.plot(step, x_track[i, 3, :], color='deepskyblue')
+        plt.plot(step, x_track[i, 3, :], color='darkgreen')
     # plt.plot(step, x_track[3, :])
     plt.ylabel('Theta Dot (rad/s)')
     plt.grid()
 
-    plt.subplot(6, 1, 5)
+    plt.subplot(7, 1, 5)
     plt.plot(step, x_nmpc_track[4, 0:ITERATIONS+1],linewidth=7, color = 'gold')
     plt.plot(step, x_nmpc_track[4, ITERATIONS+1:],linewidth=7, color = 'lightpink')
     for i in range(0, SAMPLING_TIMES):
-        plt.plot(step, x_track[i, 4, :], color='deepskyblue')
+        plt.plot(step, x_track[i, 4, :], color='darkgreen')
     # plt.plot(step, x_track[4, :])
     plt.ylabel('Theta Star (rad/s)')
     plt.grid()
 
-    plt.subplot(6, 1, 6)
+    plt.subplot(7, 1, 6)
     plt.plot(step_u, u_nmpc_track[0,:],linewidth=7, color = 'gold') # u_nmpc_track.reshape(num_loop,)
     plt.plot(step_u, u_nmpc_track[1,:],linewidth=7, color = 'lightpink')
     for i in range(0,SAMPLING_TIMES):
-        plt.plot(step_u, u_track[i, 0, :], color='deepskyblue')
+        plt.plot(step_u, u_track[i, 0, :], color='darkgreen')
     # plt.plot(step_u, u_track.reshape(num_loop,)) 
     plt.ylabel('Ctl Input (N)')
     plt.xlabel('Control Step')
     plt.grid()
 
-    # plt.subplot(7, 1, 7)
+    plt.subplot(7, 1, 7)
     # plt.plot(step, cost_D.reshape(ITERATIONS+1,)) 
-    # plt.plot(step, cost_NMPC_pos.reshape(ITERATIONS+1,)) 
-    # plt.plot(step, cost_NMPC_neg.reshape(ITERATIONS+1,))
-    # plt.ylabel('Cost')
-    # plt.xlabel('Control Step')
-    # plt.grid()
+    plt.plot(step_u, cost_NMPC_pos.reshape(ITERATIONS,), linewidth=7, color = 'gold') 
+    plt.plot(step_u, cost_NMPC_neg.reshape(ITERATIONS,), linewidth=7, color = 'lightpink')
+    for i in range(0, SAMPLING_TIMES):
+        plt.plot(step_u, cost_D[i, 0, :], color='darkgreen')
+    plt.ylabel('Cost')
+    plt.xlabel('Control Step')
+    plt.grid()
 
-    # plt.show()
+    plt.show()
     # save figure 
-    figure_name = 'Diffusion_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_diffusion_update_plot_' + '.pdf'
+    figure_name = 'Diffusion_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_diffusion_update_plot_0116' + '.pdf'
     figure_path = os.path.join(results_dir, figure_name)
     plt.savefig(figure_path)
     plt.show()
