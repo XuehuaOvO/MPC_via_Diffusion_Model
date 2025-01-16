@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import torch
 import random
 import casadi as ca
+import time
 
 # Trained Model Info
 TRAINED_MODELS_DIR = '../../trained_models/' # main loader of all saved trained models
@@ -36,6 +37,7 @@ R = 0.5
 P = np.diag([10,10,10])
 
 def main():
+    start_time = time.time()
     # memory 
     x_pos_memory = np.zeros((SAMPLING_STEPS, 3)) 
     q_pos_memory = np.zeros((SAMPLING_STEPS, 7)) 
@@ -67,8 +69,8 @@ def main():
     print(f'state_dim -- {dataset.state_dim}')
 
     # Sampling initial data
-    ini_joint_states = sampling_data_generating()
-    # ini_joint_states = np.array([[0, 0, 0, 0, 0, 0, 0]])
+    # ini_joint_states = sampling_data_generating()
+    ini_joint_states = np.array([[0, 0, 0, 0, 0, 0, 0]])
 
     # panda mujoco
     panda = mujoco.MjModel.from_xml_path('/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/Panda/xml/mjx_scene.xml')
@@ -90,7 +92,7 @@ def main():
 
     # set initial conditioning info
     # x_current = x0.copy()
-
+    single_time_set = np.zeros((SAMPLING_STEPS, 1))
     # initialize panda step
     sampling_step = 0
 
@@ -110,7 +112,12 @@ def main():
             abs_dis_memory[sampling_step,:] = np.linalg.norm(x_current_pos - TARGET_POS)
 
             # sampling
+            single_start = time.time()
             inputs_normalized_iters = diffusion_sampling(x_current, dataset, model, n_support_points)
+            single_end = time.time()
+            single_t = single_end - single_start 
+            print(f'single time -- {single_t}')
+            single_time_set[sampling_step,0] = single_t
 
             # last diffusion result unmormalize
             inputs_iters = dataset.unnormalize_states(inputs_normalized_iters)
@@ -147,17 +154,38 @@ def main():
             q_last_pos, x_last_pos, context_last = state_loading(panda,data)
             print(f'final panda x pos -- {x_last_pos}')
         
-    
+    end_time = time.time()
+    delta_t_problem_solving = end_time - start_time
+
     # final position difference
     print(f'----------------------------------------------------')
     print(f'fianl abs distance -- {abs_dis_memory[-1,0]}')
     print(f'----------------------------------------------------')
+    
+
+    # single_time_set_array = np.array(single_time_set)
 
 
     ########################## plot ##########################
-    joint_name = 'qPOS' + str(ini_joint_states[0,0]) + '_' +  str(ini_joint_states[0,1]) + '_' + str(ini_joint_states[0,2]) + '_' + str(ini_joint_states[0,3]) + '_' + str(ini_joint_states[0,4]) + '_' + str(ini_joint_states[0,5]) + '_' + str(ini_joint_states[0,6]) # + '_test8'
+    # joint_name = 'qPOS' + str(ini_joint_states[0,0]) + '_' +  str(ini_joint_states[0,1]) + '_' + str(ini_joint_states[0,2]) + '_' + str(ini_joint_states[0,3]) + '_' + str(ini_joint_states[0,4]) + '_' + str(ini_joint_states[0,5]) + '_' + str(ini_joint_states[0,6]) + '_0test_pdf'
+    joint_name = 'qPOS' + '_8test_pdf'
     figure_saving_path = os.path.join(RESULTS_SAVED_PATH, joint_name)
     os.makedirs(figure_saving_path, exist_ok=True)
+
+    # save states trajectory
+    x_trag_path =  os.path.join(figure_saving_path, f'x_trag' + '.npy')
+    # print(f'x trag size -- {x_pos_memory}')
+    np.save(x_trag_path, x_pos_memory)
+
+    # save solving time 
+    solving_time_path = os.path.join(figure_saving_path, f'solving_time_diffusion_' + '.npy')
+    print(f'single time --{delta_t_problem_solving}')
+    np.save(solving_time_path, delta_t_problem_solving)
+
+    # save single time set
+    single_time_path = os.path.join(figure_saving_path, f'single_time_diffusion_' + '.npy')
+    # print(f'single time set  --{single_time_set}')
+    np.save(single_time_path, single_time_set)
 
     T = SAMPLING_STEPS
     t = np.arange(0, T, 1)
@@ -197,7 +225,7 @@ def main():
     plt.ylabel("Joint position [rad]")
     plt.legend()  
 
-    figure_name = 'Joints trajectories' + '.png'
+    figure_name = 'Joints trajectories' + '.pdf'
     figure_path = os.path.join(figure_saving_path, figure_name)
     plt.savefig(figure_path)  
 
@@ -209,7 +237,7 @@ def main():
     plt.ylabel("Control inputs")
     plt.legend()  
 
-    figure_name = 'Ctrls trajectories' + '.png'
+    figure_name = 'Ctrls trajectories' + '.pdf'
     figure_path = os.path.join(figure_saving_path, figure_name)
     plt.savefig(figure_path)  
 
@@ -219,7 +247,7 @@ def main():
     plt.xlabel("Time [s]")
     plt.ylabel("absolute distance [m]")
 
-    figure_name = 'Absolute distance trajectory' + '.png'
+    figure_name = 'Absolute distance trajectory' + '.pdf'
     figure_path = os.path.join(figure_saving_path, figure_name)
     plt.savefig(figure_path)  
 
@@ -397,6 +425,7 @@ def diffusion_sampling(x_current, dataset, model, n_support_points):
     context = dataset.normalize_condition(x_current)
     context_weight = WEIGHT_GUIDANC
 
+
     # sampling
     with TimerCUDA() as t_diffusion_time:
         inputs_normalized_iters = model.run_CFG(
@@ -407,6 +436,7 @@ def diffusion_sampling(x_current, dataset, model, n_support_points):
             n_diffusion_steps_without_noise=5,
         )
     print(f't_model_sampling: {t_diffusion_time.elapsed:.4f} sec')
+    # print(f'single_time: {t_diffusion_time} sec')
     print(inputs_normalized_iters.size()) # 31 1 128 7
 
     return inputs_normalized_iters
