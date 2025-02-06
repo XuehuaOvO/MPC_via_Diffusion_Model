@@ -9,6 +9,7 @@ from torch_robotics.torch_utils.torch_timer import TimerCUDA
 from torch_robotics.torch_utils.torch_utils import get_torch_device, freeze_torch_model_params
 
 import mujoco
+import mujoco.viewer
 import numpy as np
 import os
 import matplotlib.pyplot as plt
@@ -43,6 +44,7 @@ def main():
     q_pos_memory = np.zeros((SAMPLING_STEPS, 7)) 
     ctl_memory = np.zeros((SAMPLING_STEPS, 7))
     abs_dis_memory = np.zeros((SAMPLING_STEPS, 1))
+    cost_memory = np.zeros((SAMPLING_STEPS, 1))
 
     # load model path
     model_dir = MODEL_PATH 
@@ -75,6 +77,7 @@ def main():
     # panda mujoco
     panda = mujoco.MjModel.from_xml_path('/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/Panda/xml/mjx_scene.xml')
     data = mujoco.MjData(panda)
+    # viewer = mujoco.viewer.launch(panda, data)
 
     # panda initialization
     data.qpos[:7] = ini_joint_states
@@ -130,6 +133,10 @@ def main():
 
             # horizon_inputs = np.zeros((1, HORIZON, 7))
             inputs_final = inputs_final.cpu()
+            diffusion_predicted_states = diffusion_horizon_states(x_current_pos, inputs_final, q_current_pos)
+            cost = mpc_cost(diffusion_predicted_states, inputs_final, Q, R, P)
+            cost_memory[sampling_step,0] = cost
+
             # for n in range(0,HORIZON):
             #     horizon_inputs[0,n,:] = round(inputs_final[0,n,:].item(),4)
             # print(f'horizon_inputs -- {horizon_inputs}')
@@ -168,7 +175,7 @@ def main():
 
     ########################## plot ##########################
     # joint_name = 'qPOS' + str(ini_joint_states[0,0]) + '_' +  str(ini_joint_states[0,1]) + '_' + str(ini_joint_states[0,2]) + '_' + str(ini_joint_states[0,3]) + '_' + str(ini_joint_states[0,4]) + '_' + str(ini_joint_states[0,5]) + '_' + str(ini_joint_states[0,6]) + '_0test_pdf'
-    joint_name = 'qPOS' + '_8test_pdf'
+    joint_name = 'cost' + '_collecting_sample_16'
     figure_saving_path = os.path.join(RESULTS_SAVED_PATH, joint_name)
     os.makedirs(figure_saving_path, exist_ok=True)
 
@@ -186,6 +193,12 @@ def main():
     single_time_path = os.path.join(figure_saving_path, f'single_time_diffusion_' + '.npy')
     # print(f'single time set  --{single_time_set}')
     np.save(single_time_path, single_time_set)
+
+    # save cost 
+    cost_sum = np.sum(cost_memory)
+    cost_path = os.path.join(figure_saving_path, f'cost_' + '.npy')
+    print(f'total cost --{cost_sum}')
+    np.save(cost_path, cost_sum)
 
     T = SAMPLING_STEPS
     t = np.arange(0, T, 1)
@@ -445,7 +458,8 @@ def diffusion_sampling(x_current, dataset, model, n_support_points):
 # diffusion cost
 def mpc_cost(predicted_states, predicted_controls, Q, R, P):
     cost = 0
-
+    predicted_controls = predicted_controls.numpy()
+    predicted_controls = predicted_controls.transpose(2,1,0) # 1*128*7 --> 7*128*1 
     # initial cost
     x_0 = predicted_states[:,0,0]
     cost = Q[0,0]*(x_0[0]-TARGET_POS[0])**2 + Q[1,1]*(x_0[1]-TARGET_POS[1])**2 + Q[2,2]*(x_0[2]-TARGET_POS[2])**2
@@ -465,6 +479,26 @@ def mpc_cost(predicted_states, predicted_controls, Q, R, P):
     cost += P[0,0]*(x_end[0]-TARGET_POS[0])**2 + P[1,1]*(x_end[1]-TARGET_POS[1])**2 + P[2,2]*(x_end[2]-TARGET_POS[2])**2 # + 0.5*(ca.sumsqr(u_end-u_end_1))
 
     return cost
+
+def diffusion_horizon_states(x_current_pos, inputs_final, q_current_pos):
+    panda_cost = mujoco.MjModel.from_xml_path('/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/Panda/xml/mjx_scene.xml')
+    data_cost = mujoco.MjData(panda_cost)
+    data_cost.qpos[:7] = q_current_pos.reshape(7)
+    mujoco.mj_step(panda_cost, data_cost)
+     
+    diffusion_horizon_states = np.zeros((3,HORIZON+1,1))
+
+    x_current = np.array(data_cost.xpos[9,:]).reshape(-1, 1)
+    diffusion_horizon_states[:,0,0] = x_current.reshape(3)
+     
+    for k in range(0,HORIZON):
+        data_cost.ctrl[:7] = inputs_final[0,k,:].numpy()
+        mujoco.mj_step(panda_cost, data_cost)
+        x_current = np.array(data_cost.xpos[9,:]).reshape(-1, 1)
+        diffusion_horizon_states[:,k+1,0] = x_current.reshape(3)
+
+    return diffusion_horizon_states
+
 
 
 if __name__ == "__main__":
