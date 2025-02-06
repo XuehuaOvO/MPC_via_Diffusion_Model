@@ -11,7 +11,7 @@ import multiprocessing
 ############### Seetings ######################
 # Attention: this py file can only set the initial range of position and theta, initial x_dot and theta_dot are always 0
 
-MAX_CORE_CPU = 25
+MAX_CORE_CPU = 16
 
 # data saving folder
 SAVE_PATH =  "/MPC_DynamicSys/sharedVol/train_data/nmpc/multi_normal"
@@ -63,11 +63,11 @@ np.random.seed(42)
 
 # mpc parameters
 NUM_STATE = 5
-Q_REDUNDANT = 1000.0
-P_REDUNDANT = 1000.0
-Q = np.diag([0.01, 0.01, 0, 0.001, Q_REDUNDANT])
+Q_REDUNDANT = 10000.0
+P_REDUNDANT = 10000.0
+Q = np.diag([0.01, 0.01, 0, 0.01, Q_REDUNDANT])
 R = 0.1
-P = np.diag([0.01, 0.01, 0, 0.001, P_REDUNDANT])
+P = np.diag([0.01, 0.01, 0, 0.01, P_REDUNDANT])
 # Q = np.diag([0.01, 0.01, 0, 0.01, Q_REDUNDANT])
 # R = 0.001
 # P = np.diag([0.01, 0.1, 0, 0.1, P_REDUNDANT])
@@ -372,7 +372,7 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         plt.xlabel("Time [s]")
         plt.ylabel("state")
         plt.legend()
-        figure_name = 'idx-' + str(idx_group_of_control_step) + '_x' + '.pdf'
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_x_0121' + '.pdf'
         figure_path = os.path.join(FOLDER_PATH, figure_name)
         plt.savefig(figure_path)
 
@@ -388,7 +388,7 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         plt.xlabel("Time [s]")
         plt.ylabel("control input")
         plt.legend()
-        figure_name = 'idx-' + str(idx_group_of_control_step) + '_u' + '.pdf'
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_u_0121' + '.pdf'
         figure_path = os.path.join(FOLDER_PATH, figure_name)
         plt.savefig(figure_path)
 
@@ -404,7 +404,7 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         plt.xlabel("Time [s]")
         plt.ylabel("cost")
         plt.legend()
-        figure_name = 'idx-' + str(idx_group_of_control_step) + '_j' + '.pdf'
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_j_0121' + '.pdf'
         figure_path = os.path.join(FOLDER_PATH, figure_name)
         plt.savefig(figure_path)
 

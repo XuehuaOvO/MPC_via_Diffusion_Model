@@ -18,7 +18,7 @@ from torch_robotics.torch_utils.torch_utils import get_torch_device
 def experiment(
     ########################################################################
     # Dataset
-    dataset_subdir: str = 'CartPole-LMPC',
+    dataset_subdir: str = 'CartPole-NMPC',
     include_velocity: bool = False,
 
     ########################################################################

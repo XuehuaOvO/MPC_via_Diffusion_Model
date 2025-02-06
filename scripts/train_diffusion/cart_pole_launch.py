@@ -11,18 +11,18 @@ os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 ####### Setting ######
 
 # training data folder
-DATASET_SUBDIR = 'CartPole-LMPC' # the folder of the training data files (location: /root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC)
+DATASET_SUBDIR = 'CartPole-NMPC' # the folder of the training data files (location: /root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC)
 
 # training data amount
-TRAINING_DATA_AMOUNT = 180000
+TRAINING_DATA_AMOUNT = 4000 # 180000
 
 # learning parameters
 BATCH_SIZE = 512
 LEARNING_RATE = 3e-3
 
-EPOCHES = 300 # times that the whole data should be trained
+EPOCHES = 1000 # times that the whole data should be trained
 
-MODEL_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/180000_training_data'
+MODEL_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/cart_pole_pure_test1'
 
 # LAUNCHER
 

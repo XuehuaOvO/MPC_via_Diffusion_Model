@@ -597,81 +597,147 @@ def experiment(
     step = np.linspace(0,num_i,num_i+1)
     step_u = np.linspace(0,num_i-1,num_i)
 
-    plt.figure(figsize=(10,16))
+    # plt.figure(figsize=(10,16))
 
-    plt.subplot(7, 1, 1)
-    plt.plot(step, x_nmpc_track[0, 0:ITERATIONS+1],label=f'NMPC (pos guess)',linewidth=7, color = 'gold')
-    plt.plot(step, x_nmpc_track[0, ITERATIONS+1:],label=f'NMPC (neg guess)', linewidth=7, color = 'lightpink')
-    for i in range(0, SAMPLING_TIMES):
-        plt.plot(step, x_track[i, 0, :], color='darkviolet')
-    plt.plot(step, x_track[0, 0, :], label=f"NN", color='darkviolet')
-    plt.legend()
-    # plt.legend(['NN 4D Sampling', 'NMPC_pos', 'NMPC_neg']) 
-    plt.ylabel('Position (m)')
-    plt.grid()
+    # plt.subplot(7, 1, 1)
+    # plt.plot(step, x_nmpc_track[0, 0:ITERATIONS+1],label=f'NMPC (pos guess)',linewidth=7, color = 'gold')
+    # plt.plot(step, x_nmpc_track[0, ITERATIONS+1:],label=f'NMPC (neg guess)', linewidth=7, color = 'lightpink')
+    # for i in range(0, SAMPLING_TIMES):
+    #     plt.plot(step, x_track[i, 0, :], color='darkviolet')
+    # plt.plot(step, x_track[0, 0, :], label=f"NN", color='darkviolet')
+    # plt.legend()
+    # # plt.legend(['NN 4D Sampling', 'NMPC_pos', 'NMPC_neg']) 
+    # plt.ylabel('Position (m)')
+    # plt.grid()
 
-    plt.subplot(7, 1, 2)
-    # plt.plot(step, x_track[1, :])
-    plt.plot(step, x_nmpc_track[1, 0:ITERATIONS+1],linewidth=7, color = 'gold')
-    plt.plot(step, x_nmpc_track[1, ITERATIONS+1:],linewidth=7, color = 'lightpink')
-    for i in range(0, SAMPLING_TIMES):
-        plt.plot(step, x_track[i, 1, :], color='darkviolet')
-    plt.ylabel('Velocity (m/s)')
-    plt.grid()
+    # plt.subplot(7, 1, 2)
+    # # plt.plot(step, x_track[1, :])
+    # plt.plot(step, x_nmpc_track[1, 0:ITERATIONS+1],linewidth=7, color = 'gold')
+    # plt.plot(step, x_nmpc_track[1, ITERATIONS+1:],linewidth=7, color = 'lightpink')
+    # for i in range(0, SAMPLING_TIMES):
+    #     plt.plot(step, x_track[i, 1, :], color='darkviolet')
+    # plt.ylabel('Velocity (m/s)')
+    # plt.grid()
 
-    plt.subplot(7, 1, 3)
-    # plt.plot(step, x_track[2, :])
-    plt.plot(step, x_nmpc_track[2, 0:ITERATIONS+1],linewidth=7, color = 'gold')
-    plt.plot(step, x_nmpc_track[2, ITERATIONS+1:],linewidth=7, color = 'lightpink')
-    for i in range(0,SAMPLING_TIMES):
-        plt.plot(step, x_track[i, 2, :], color='darkviolet')
-    plt.ylabel('Theta (rad)')
-    plt.grid()
+    # plt.subplot(7, 1, 3)
+    # # plt.plot(step, x_track[2, :])
+    # plt.plot(step, x_nmpc_track[2, 0:ITERATIONS+1],linewidth=7, color = 'gold')
+    # plt.plot(step, x_nmpc_track[2, ITERATIONS+1:],linewidth=7, color = 'lightpink')
+    # for i in range(0,SAMPLING_TIMES):
+    #     plt.plot(step, x_track[i, 2, :], color='darkviolet')
+    # plt.ylabel('Theta (rad)')
+    # plt.grid()
 
-    plt.subplot(7, 1, 4)
-    # plt.plot(step, x_track[3, :])
-    plt.plot(step, x_nmpc_track[3, 0:ITERATIONS+1],linewidth=7, color = 'gold')
-    plt.plot(step, x_nmpc_track[3, ITERATIONS+1:],linewidth=7, color = 'lightpink')
-    for i in range(0, SAMPLING_TIMES):
-        plt.plot(step, x_track[i, 3, :], color='darkviolet')
-    plt.ylabel('Theta Dot (rad/s)')
-    plt.grid()
+    # plt.subplot(7, 1, 4)
+    # # plt.plot(step, x_track[3, :])
+    # plt.plot(step, x_nmpc_track[3, 0:ITERATIONS+1],linewidth=7, color = 'gold')
+    # plt.plot(step, x_nmpc_track[3, ITERATIONS+1:],linewidth=7, color = 'lightpink')
+    # for i in range(0, SAMPLING_TIMES):
+    #     plt.plot(step, x_track[i, 3, :], color='darkviolet')
+    # plt.ylabel('Theta Dot (rad/s)')
+    # plt.grid()
 
-    plt.subplot(7, 1, 5)
-    # plt.plot(step, x_track[4, :])
-    plt.plot(step, x_nmpc_track[4, 0:ITERATIONS+1],linewidth=7, color = 'gold')
-    plt.plot(step, x_nmpc_track[4, ITERATIONS+1:],linewidth=7, color = 'lightpink')
-    for i in range(0, SAMPLING_TIMES):
-        plt.plot(step, x_track[i, 4, :], color='darkviolet')
-    plt.ylabel('Theta Star (rad/s)')
-    plt.grid()
+    # plt.subplot(7, 1, 5)
+    # # plt.plot(step, x_track[4, :])
+    # plt.plot(step, x_nmpc_track[4, 0:ITERATIONS+1],linewidth=7, color = 'gold')
+    # plt.plot(step, x_nmpc_track[4, ITERATIONS+1:],linewidth=7, color = 'lightpink')
+    # for i in range(0, SAMPLING_TIMES):
+    #     plt.plot(step, x_track[i, 4, :], color='darkviolet')
+    # plt.ylabel('Theta Star (rad/s)')
+    # plt.grid()
 
-    plt.subplot(7, 1, 6)
-    # plt.plot(step_u, u_track.reshape(num_loop,)) 
-    plt.plot(step_u, u_nmpc_track[0,:],linewidth=7, color = 'gold') # u_nmpc_track.reshape(num_loop,)
-    plt.plot(step_u, u_nmpc_track[1,:],linewidth=7, color = 'lightpink')
-    for i in range(0,SAMPLING_TIMES):
-        plt.plot(step_u, u_track[i, 0, :], color='darkviolet')
-    plt.ylabel('Ctl Input (N)')
+    # plt.subplot(7, 1, 6)
+    # # plt.plot(step_u, u_track.reshape(num_loop,)) 
+    # plt.plot(step_u, u_nmpc_track[0,:],linewidth=7, color = 'gold') # u_nmpc_track.reshape(num_loop,)
+    # plt.plot(step_u, u_nmpc_track[1,:],linewidth=7, color = 'lightpink')
+    # for i in range(0,SAMPLING_TIMES):
+    #     plt.plot(step_u, u_track[i, 0, :], color='darkviolet')
+    # plt.ylabel('Ctl Input (N)')
+    # # plt.xlabel('Control Step')
+    # plt.grid()
+
+    # plt.subplot(7, 1, 7)
+    # # plt.plot(step, cost_NN.reshape(ITERATIONS,)) 
+    # plt.plot(step_u, cost_NMPC_pos.reshape(ITERATIONS,), linewidth=7, color = 'gold') 
+    # plt.plot(step_u, cost_NMPC_neg.reshape(ITERATIONS,), linewidth=7, color = 'lightpink')
+    # for i in range(0, SAMPLING_TIMES):
+    #     plt.plot(step_u, cost_NN[i, 0, :], color='darkviolet')
+    # plt.ylabel('Cost')
     # plt.xlabel('Control Step')
-    plt.grid()
+    # plt.grid()
 
-    plt.subplot(7, 1, 7)
-    # plt.plot(step, cost_NN.reshape(ITERATIONS,)) 
-    plt.plot(step_u, cost_NMPC_pos.reshape(ITERATIONS,), linewidth=7, color = 'gold') 
-    plt.plot(step_u, cost_NMPC_neg.reshape(ITERATIONS,), linewidth=7, color = 'lightpink')
-    for i in range(0, SAMPLING_TIMES):
-        plt.plot(step_u, cost_NN[i, 0, :], color='darkviolet')
-    plt.ylabel('Cost')
+    # # plt.show()
+    # # save figure 
+    # figure_name = 'NN_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_inirange_test0116_1' '.pdf'
+    # figure_path = os.path.join(results_dir, figure_name)
+    # plt.savefig(figure_path)
+    # plt.show()
+
+    plt.figure()
+    # plt.subplot(7, 1, 3)
+    plt.plot(step, x_nmpc_track[2, 0:ITERATIONS+1], label=f'NMPC (pos guess)', linewidth=5, color = 'gold')
+    plt.plot(step, x_nmpc_track[2, ITERATIONS+1:], label=f'NMPC (neg guess)',linewidth=5, color = 'lightpink')
+    for i in range(0,SAMPLING_TIMES):
+        plt.plot(step, x_track[i, 2, :],  color='darkviolet')
+    plt.plot(step, x_track[i, 2, :], label=f"NN",  color='darkviolet')
+    # plt.plot(step, x_track[2, :])
+    plt.ylabel('Theta (rad)')
     plt.xlabel('Control Step')
     plt.grid()
-
-    # plt.show()
-    # save figure 
-    figure_name = 'NN_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_inirange_test0116_1' '.pdf'
+    plt.legend()
+    figure_name = 'NN_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_diffusion_theta_0203' + '.pdf'
     figure_path = os.path.join(results_dir, figure_name)
     plt.savefig(figure_path)
-    plt.show()
+    
+    plt.figure()
+    # plt.subplot(7, 1, 4)
+    plt.plot(step, x_nmpc_track[3, 0:ITERATIONS+1], label=f'NMPC (pos guess)',linewidth=5, color = 'gold')
+    plt.plot(step, x_nmpc_track[3, ITERATIONS+1:], label=f'NMPC (neg guess)',linewidth=5, color = 'lightpink')
+    for i in range(0, SAMPLING_TIMES):
+        plt.plot(step, x_track[i, 3, :],  color='darkviolet')
+    plt.plot(step, x_track[i, 3, :], label=f"NN",  color='darkviolet')
+    # plt.plot(step, x_track[3, :])
+    plt.ylabel('Theta Dot (rad/s)')
+    plt.xlabel('Control Step')
+    plt.grid()
+    plt.legend()
+    figure_name = 'NN_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_diffusion_thetadot_0203' + '.pdf'
+    figure_path = os.path.join(results_dir, figure_name)
+    plt.savefig(figure_path)
+    
+    plt.figure()
+    # plt.subplot(7, 1, 5)
+    plt.plot(step, x_nmpc_track[4, 0:ITERATIONS+1], label=f'NMPC (right)', linewidth=5, color = 'gold')
+    plt.plot(step, x_nmpc_track[4, ITERATIONS+1:],label=f'NMPC (left)', linewidth=5, color = 'lightpink')
+    for i in range(0, SAMPLING_TIMES):
+        plt.plot(step, x_track[i, 4, :],  color='darkviolet')
+    plt.plot(step, x_track[i, 4, :], label=f"NN",  color='darkviolet')
+    # plt.plot(step, x_track[4, :])
+    plt.ylabel('Theta Star (rad)')
+    plt.xlabel('Control Step')
+    plt.grid()
+    plt.legend()
+    figure_name = 'NN_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_diffusion_thetastar_0203' + '.pdf'
+    figure_path = os.path.join(results_dir, figure_name)
+    plt.savefig(figure_path)
+    
+    plt.figure()
+    plt.xticks(fontsize=10, fontweight='bold')
+    plt.yticks(fontsize=10, fontweight='bold')
+    # plt.subplot(7, 1, 6)
+    plt.plot(step_u, u_nmpc_track[0,:],linewidth=5, label=f'NMPC (right)', color = 'gold') # u_nmpc_track.reshape(num_loop,)
+    plt.plot(step_u, u_nmpc_track[1,:],linewidth=5, label=f'NMPC (left)', color = 'lightpink')
+    for i in range(0,SAMPLING_TIMES):
+        plt.plot(step_u, u_track[i, 0, :], color='darkviolet')
+    plt.plot(step_u, u_track[i, 0, :], label=f"NN",  color='darkviolet')
+    # plt.plot(step_u, u_track.reshape(num_loop,)) 
+    plt.ylabel('Ctl Input (N)', fontsize=14, fontweight='bold')
+    plt.xlabel('Control Step', fontsize=14, fontweight='bold')
+    plt.grid()
+    plt.legend(fontsize=14, prop={'weight': 'bold'})
+    figure_name = 'NN_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_diffusion_ctrl_0203' + '.pdf'
+    figure_path = os.path.join(results_dir, figure_name)
+    plt.savefig(figure_path)
 
     ######### Performance Check #########
     # position_difference = np.sum(np.abs(x_track[0, :] - x_nmpc_track[0, :]))
