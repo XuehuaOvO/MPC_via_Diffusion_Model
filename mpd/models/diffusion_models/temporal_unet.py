@@ -17,7 +17,12 @@ UNET_DIM_MULTS = {
 }
 
 # load conditioning info size for conditioning_embed_dim (add the conditioning info PT file path)
-CONDITION_DATA = torch.load('/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/Panda-Data/panda_test4/x_data_cat_test4.pt')
+# example '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC/x0_tensor_180000-4.pt'
+
+# Panda
+# CONDITION_DATA = torch.load('/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/Panda-Data/panda_test6/x_data_cat_test6.pt') # /root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/Panda-Data/panda_test4/x_data_cat_test4.pt
+# Cart Pole
+CONDITION_DATA = torch.load('/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data_collecting/nmpc_cart_pole_training_pt/x_data_cat_test1.pt')
 X_SIZE = CONDITION_DATA.size(dim=1)
 
 class TemporalUnet(nn.Module):
