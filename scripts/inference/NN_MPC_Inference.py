@@ -28,10 +28,10 @@ MODEL_FOLDER = 'nn_180000' # choose a main model folder saved in the trained_mod
 MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/nn_180000' # the absolute path of the trained model
 MODEL_ID = 'nn_180000' # number of training
 
-POSITION_INITIAL_RANGE = np.linspace(-1,1,5) 
-THETA_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4,5) 
+POSITION_INITIAL_RANGE = np.linspace(-1,1,20) 
+THETA_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4,20) 
 WEIGHT_GUIDANC = 0.01 # non-conditioning weight
-X0_IDX = 18 # range:[0,199] 20*20 data 
+X0_IDX = 64 # range:[0,199] 20*20 data 
 ITERATIONS = 50 # control loop (steps)
 HORIZON = 8 # mpc horizon
 
@@ -494,7 +494,7 @@ def experiment(
     plt.subplot(5, 1, 1)
     plt.plot(step, x_track[0, :])
     plt.plot(step, x_mpc_track[0, :])
-    plt.legend(['Diffusion Sampling', 'MPC']) 
+    plt.legend(['NN Sampling', 'MPC']) 
     plt.ylabel('Position (m)')
     plt.grid()
 
@@ -524,7 +524,7 @@ def experiment(
     plt.grid()
     # plt.show()
     # save figure 
-    figure_name = 'NN_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '.png'
+    figure_name = 'NN_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_new' + '.pdf'
     figure_path = os.path.join(results_dir, figure_name)
     plt.savefig(figure_path)
 

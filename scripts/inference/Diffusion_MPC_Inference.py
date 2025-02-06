@@ -22,18 +22,18 @@ allow_ops_in_compiled_graph()
 
 
 TRAINED_MODELS_DIR = '../../trained_models/' # main loader of all saved trained models
-MODEL_FOLDER = '180000_training_data' # choose a folder in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
-MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/180000_training_data/100000' # the absolute path of the trained model
-MODEL_ID = '100000' # number of training
+MODEL_FOLDER = 'cart_pole_84000_test1'   # '180000_training_data' # choose a folder in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
+MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/cart_pole_84000_test1/final' # the absolute path of the trained model
+MODEL_ID = 'final' # number of training
 
-POSITION_INITIAL_RANGE = np.linspace(-1,1,5) 
-THETA_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4,5) 
+POSITION_INITIAL_RANGE = np.linspace(-1,1,10) 
+THETA_INITIAL_RANGE = np.linspace(3*np.pi/4,5*np.pi/4,10) 
 WEIGHT_GUIDANC = 0.01 # non-conditioning weight
-X0_IDX = 18 # range:[0,24] 5*5 data 
-ITERATIONS = 50 # control loop (steps)
-HORIZON = 8 # mpc horizon
+X0_IDX = 64 # range:[0,24] 5*5 data 
+ITERATIONS = 80 # control loop (steps)
+HORIZON = 32 # mpc horizon
 
-RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/180000set'
+RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/cart_pole_test1_84000'
 
 # cart pole dynamics
 def cart_pole_dynamics(x, u):
@@ -476,7 +476,7 @@ def experiment(
     plt.grid()
     # plt.show()
     # save figure 
-    figure_name = 'w_' + str(WEIGHT_GUIDANC) + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '.png'
+    figure_name = 'w_' + str(WEIGHT_GUIDANC) + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_new' + '.pdf'
     figure_path = os.path.join(results_dir, figure_name)
     plt.savefig(figure_path)
 
