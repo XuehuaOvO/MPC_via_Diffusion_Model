@@ -188,3 +188,4 @@ deps/isaac-gym-preview-4
 /training_data_collecting/
 /cart pole nmpc/
 /figures/
+/scripts/Panda/nmpc_time_data/
