@@ -1,0 +1,488 @@
+import casadi as ca
+import numpy as np
+import control
+import torch
+import os
+import matplotlib.pyplot as plt
+import time
+from multiprocessing import Pool, Manager, Array
+import multiprocessing
+from acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver, AcadosSimSolver
+
+MAX_CORE_CPU = 1  # 16
+
+##### Acrobot Parameters (Gym) #####
+LINK_LENGTH_1 = 1.0  # [m]
+LINK_LENGTH_2 = 1.0  # [m]
+LINK_MASS_1 = 1.0  #: [kg] mass of link 1
+LINK_MASS_2 = 1.0  #: [kg] mass of link 2
+LINK_COM_POS_1 = 0.5  #: [m] position of the center of mass of link 1
+LINK_COM_POS_2 = 0.5  #: [m] position of the center of mass of link 2
+LINK_MOI = 1.0  #: moments of inertia for both links
+G = 9.81 # [m/s^2]
+
+
+##### MPC parameters #####
+N = CONTROL_STEPS = 80
+
+# (for 1 time solving)
+HOR = 64 # mpc prediction horizon
+TS = 0.001
+TF = HOR 
+
+NUM_X = 6 # theta1, theta2, theta_1_dot, theta_2_dot, theta_star_1, theta_star_2
+NUM_U = 1 # tau
+IDX_THETA1_INI = 0
+IDX_THETA2_INI = 1
+
+##### cost function weights #####
+"Q = np.diag([0.1, 0.1, 0.1, 0.1]), R = 0.1, P = np.diag([1, 1, 1, 1])"
+# Q, R --> W for Acado ocp
+
+# intermediate weights
+W = np.diag([1e-5, 1e-5, 1e-5, 1e-5, 1e-1, 1e-1, 1e-3]) # 6 states + 1 control input
+# terminal weights
+W_TERMINAL = np.diag([1e-5, 1e-5, 1e-5, 1e-5, 1e-1, 1e-1]) # 6 states
+# initial weights
+W_INI = np.diag([1e-5, 1e-5, 1e-5, 1e-5, 1e-1, 1e-1, 1e-3]) # 6 states + 1 control input
+
+# reference state
+X_REF = np.array([np.pi, 0, 0, 0, 0, 0, 0]) # 6 states + 1 u, (7,)
+X_REF_TERMINAL = np.array([np.pi, 0, 0, 0, 0, 0]) # 6 states
+X_REF_INI= np.array([np.pi, 0, 0, 0, 0, 0, 0, 0]) # 6 states + 1 u
+
+# initial data range
+NUM_INITIAL_THETA1 = 2
+Theta1_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4, NUM_INITIAL_THETA1) 
+
+NUM_INITIAL_THETA2 = 2
+Theta2_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4, NUM_INITIAL_THETA2) 
+
+# rng_theta1 = np.concatenate([Theta1_INITIAL_RANGE_1, Theta1_INITIAL_RANGE_2])
+# rng_theta2 = np.concatenate([Theta2_INITIAL_RANGE_1, Theta2_INITIAL_RANGE_2])
+
+rng0 = []
+for idx1 in Theta1_INITIAL_RANGE:
+    for idx2 in Theta2_INITIAL_RANGE:
+        rng0.append([idx1,idx2])
+rng0 = np.array(rng0)
+num_datagroup = len(rng0)
+print(f'rng0 -- {rng0.shape}')
+
+# initial guess
+INITIAL_GUESS_NUM = 2
+initial_guess_x = [np.pi/2, -np.pi/2]
+initial_guess_u = [10, -10]
+
+# Theta star
+PI_UNDER_2 = 2/np.pi
+
+def Theta1ToThetaStar1(theta1):
+    return (theta1)**2/-np.pi + np.pi
+
+def Theta2ToThetaStar2(theta2):
+    return (theta2-np.pi)**2/-np.pi + np.pi
+
+
+########## dynamics of Acrobot ##########
+def Acrobot_dynamic_Casadi(x, u) -> ca.vertcat:
+   
+   "x[0] theta_1, x[1] theta_2, x[2] theta_1_dot, x[3] theta_2_dot"
+   
+   # mass matrix elements
+   m11 = LINK_MOI + LINK_MOI + LINK_MASS_2*LINK_LENGTH_1**2 + 2*LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*np.sin(x[1])
+   m12 = LINK_MOI + LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*np.sin(x[1])
+   m21 = LINK_MOI + LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*np.sin(x[1])
+   m22 = LINK_MOI 
+
+   Mass = ca.SX([[m11, m12],
+              [m21, m22]])
+   Mass_inv = ca.inv(Mass)
+
+   # Coriolis matrix elements
+   c11 = -2*LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*np.sin(x[1])*x[3]
+   c12 = -LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*x[3]
+   c21 = LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*x[2]
+   c22 = 0
+
+   Cor = ca.SX([[c11, c12],
+              [c21, c22]])
+
+   # gravitational torque matrix elements
+   taug1 = -LINK_MASS_1*G*LINK_COM_POS_1*np.sin(x[0]) - LINK_MASS_2*G*(LINK_LENGTH_1*np.sin(x[0]) + LINK_COM_POS_2*np.sin(x[0] + x[1]))
+   taug2 = -LINK_MASS_2*G*LINK_COM_POS_2*np.sin(x[0] + x[1])
+
+   Taug = ca.SX([[taug1],
+                 [taug2]])
+   
+   # B matrix
+   B_matrix = ca.SX([[0],
+                     [1]])
+   
+   # calculate theta_ddot
+   theta_dot = ca.SX([x[2],
+                      x[3]])
+   
+   theta_ddot = Mass_inv*(Taug + B_matrix*u - Cor*theta_dot)
+
+
+   return ca.vertcat(
+        x[2], # theta_1_dot
+
+        x[3], # theta_2_dot
+
+        theta_ddot[0], # theta_1_ddot
+
+        theta_ddot[1], # theta_2_ddot
+    )
+
+########## define Acado Model ##########
+def Acrobot_Acado_model():
+   x = ca.SX.sym('x', 6)  # x[0] theta_1, x[1] theta_2, x[2] theta_1_dot, x[3] theta_2_dot, x[4] theta_star_1, x[5] theta_star_2
+   u = ca.SX.sym('u', 1)  # u tau
+   
+   # mass matrix elements
+   m11 = LINK_MOI + LINK_MOI + LINK_MASS_2*LINK_LENGTH_1**2 + 2*LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(x[1])
+   m12 = LINK_MOI + LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(x[1])
+   m21 = LINK_MOI + LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(x[1])
+   m22 = LINK_MOI 
+
+   Mass = ca.vertcat(
+          ca.horzcat(m11, m12),
+          ca.horzcat(m21, m22))
+   Mass_inv = ca.inv(Mass)
+
+   # Coriolis matrix elements  
+   c11 = -2*LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(x[1])*x[3]
+   c12 = -LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*x[3]
+   c21 = LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*x[2]
+   c22 = 0
+
+   Cor = ca.vertcat(
+          ca.horzcat(c11, c12),
+          ca.horzcat(c21, c22))
+   
+   # gravitational torque matrix elements
+   taug1 = -LINK_MASS_1*G*LINK_COM_POS_1*ca.sin(x[0]) - LINK_MASS_2*G*(LINK_LENGTH_1*ca.sin(x[0]) + LINK_COM_POS_2*ca.sin(x[0] + x[1]))
+   taug2 = -LINK_MASS_2*G*LINK_COM_POS_2*ca.sin(x[0] + x[1])
+
+   Taug = ca.vertcat(taug1,
+                     taug2)
+   
+   # B matrix
+   B_u = ca.vertcat(0, u)
+   # B_matrix = ca.SX([[0],[1]])
+   
+   # calculate theta_ddot
+   theta_dot = ca.vertcat(x[2], x[3])
+   
+   theta_ddot = Mass_inv@(Taug + B_u - Cor@theta_dot)
+   # print("theta_ddot shape:", theta_ddot.shape)
+
+   dynam_acrobot = ca.vertcat(
+        x[2], # theta_1_dot
+
+        x[3], # theta_2_dot
+
+        theta_ddot[0], # theta_1_ddot
+
+        theta_ddot[1], # theta_2_ddot
+
+        -PI_UNDER_2 * (x[0]) * x[2], # theta_1_star_dot
+
+        -PI_UNDER_2 * (x[1]-np.pi) * x[3], # theta_2_star_dot
+    )
+ 
+   model = AcadosModel()
+   model.name = "acrobot_acado"
+   model.x    = x
+   model.xdot = ca.SX.sym('xdot', 6)
+   model.u    = u
+   model.p    = []
+   model.f_expl_expr = dynam_acrobot
+
+   return model
+
+########## create Acado ocp (optimal control problem) solver ##########
+def Acado_ocp_solver(x0):
+   ocp = AcadosOcp()
+   
+   # ocp solver
+   ocp.solver_options.N_horizon = CONTROL_STEPS
+   ocp.solver_options.tf = TF
+   
+   # load acrobot acado model
+   model = Acrobot_Acado_model()
+   ocp.model = model
+   ocp.model.x = model.x
+   ocp.model.u = model.u
+   ocp.model.cost_y_expr = ca.vertcat(model.x, model.u) # Define cost function expression (GPT)
+   ocp.model.cost_y_expr_e = model.x # terminal cost 
+
+   # cost function
+   ocp.cost.cost_type = 'NONLINEAR_LS'
+   ocp.cost.cost_type_e = 'NONLINEAR_LS'
+
+   
+   # weights
+   ocp.cost.W = W
+   # ocp.cost.W_0 = W_INI
+   ocp.cost.W_e = W_TERMINAL
+
+   # reference state
+   ocp.cost.yref = X_REF
+   # ocp.cost.yref_0 = X_REF_INI
+   ocp.cost.yref_e = X_REF_TERMINAL
+
+   # constraints
+   ocp.constraints.x0 = x0 # initial states
+   ocp.constraints.idxbx = np.arange(NUM_X)  # 6 constraints 
+   ocp.constraints.ubx = np.array([np.pi, np.pi, 4*np.pi, 9*np.pi, np.pi, np.pi])
+   ocp.constraints.lbx = np.array([-np.pi, -np.pi, -4*np.pi, -9*np.pi, -np.pi, -np.pi])
+
+   # solver setting
+   ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
+   ocp.solver_options.hessian_approx = 'GAUSS_NEWTON'
+   ocp.solver_options.integrator_type = 'IRK'
+   ocp.solver_options.nlp_solver_type = 'SQP'
+   # ocp.solver_options.nlp_solver_max_iter = 200
+
+   # build solver
+   acados_solver = AcadosOcpSolver(ocp, json_file="acados_ocp_acrobots.json")
+
+   acados_integrator = AcadosSimSolver(ocp, json_file = "acados_ocp_acrobots.json")
+
+   return ocp, acados_solver, acados_integrator
+
+
+
+
+
+########## single closed control loop ##########
+def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_group_of_control_step:int,x0_state:np.array, 
+                                      u_ini_memory: np.array, x_ini_memory: np.array, j_ini_memory: np.array):
+
+    ################ generate data for 0th step ##########################################################
+    try:
+
+        ########## Acado ##########
+        ocp, ocp_solver, integrator = Acado_ocp_solver(x0_state)
+
+        nx = ocp.model.x.size()[0]  # number of states (6)
+        nu = ocp.model.u.size()[0]  # number of states (1)
+
+        # x, u saving parameters
+        X_result = np.zeros((CONTROL_STEPS+1, nx))
+        U_result = np.zeros((CONTROL_STEPS, nu))
+        X_result[0, :] = x0_state
+
+        # initial guess
+        print(f'u guess -- {u_ini_guess}')
+        print(f'x guess -- {x_ini_guess}')
+        x_guess = np.array([x_ini_guess, x_ini_guess, 0, 0, Theta1ToThetaStar1(x_ini_guess), Theta2ToThetaStar2(x_ini_guess)])
+        u_guess = u_ini_guess
+    
+        # set initial guess
+        ocp_solver.set(0, "u", u_guess) 
+        ocp_solver.set(0, "x", x_guess)
+
+        # ocp solving
+        for i in range(0, CONTROL_STEPS):
+
+            # stage 0 of the prediction horizon is the current state
+            ocp_solver.set(0, "lbx", X_result[i, :]) 
+            ocp_solver.set(0, "ubx", X_result[i, :])
+            status = ocp_solver.solve()
+
+            ocp.solver_options.print_level = 3
+            ocp_solver.print_statistics()
+
+            if status != 0:
+               print(f"Solver failed at step {i} with status {status}")
+
+            u_solve = ocp_solver.get(0, "u")  
+
+            U_result[i,:] = u_solve
+
+            # state updating
+            integrator.set("x", X_result[i, :])
+            integrator.set("u", u_solve)
+            integrator.solve()
+            x_next = integrator.get("x")
+
+            X_result[i+1,:] = x_next
+        
+        print(f'X_result -- {X_result}')
+        print(f'U_result -- {U_result}')
+        
+        # noisy at x0
+        # MPC_NoiseData_Process(x0_state, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_random_memory, x_random_memory, j_random_memory)
+        
+        ############################################## generate data for control step loop ##############################################
+        # main mpc loop
+        # for idx_control_step in range(1, CONTROL_STEPS):
+        #     #system dynamic update x 
+        #     x0_next = EulerForwardCartpole_virtual(TS,x0_state,u0)
+            
+        #     ################################################# normal mpc loop to update state #################################################
+        #     u0_cur = MPC_NormalData_Process(x0_next, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_ini_memory, j_ini_memory, x_ini_memory, idx_control_step)
+
+        #     ################################## noise  ##################################
+        #     MPC_NoiseData_Process(x0_next, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_random_memory, x_random_memory, j_random_memory, idx_control_step, True)
+            
+        #     # update
+        #     x0_state = x0_next
+        #     u0 = u0_cur
+        
+
+        #################### data saving ####################
+        # to tensor
+        torch_u_ini_memory_tensor = torch.Tensor(u_ini_memory)
+        # torch_u_random_memory_tensor = torch.Tensor(u_random_memory)
+        torch_x_ini_memory_tensor = torch.Tensor(x_ini_memory)
+        # torch_x_random_memory_tensor = torch.Tensor(x_random_memory)
+        torch_j_ini_memory_tensor = torch.Tensor(j_ini_memory)
+        # torch_j_random_memory_tensor = torch.Tensor(j_random_memory)
+
+        # torch.save(torch_u_ini_memory_tensor, os.path.join(FOLDER_PATH , f'pure_u_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        # torch.save(torch_x_ini_memory_tensor , os.path.join(FOLDER_PATH , f'pure_x_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        # torch.save(torch_j_ini_memory_tensor, os.path.join(FOLDER_PATH , f'pure_j_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        
+        # cat
+        # u_data = torch.cat((torch_u_ini_memory_tensor, torch_u_random_memory_tensor), dim=0)
+        # x_data = torch.cat((torch_x_ini_memory_tensor, torch_x_random_memory_tensor), dim=0)
+        # j_data = torch.cat((torch_j_ini_memory_tensor, torch_j_random_memory_tensor), dim=0)
+
+        print(f'u_size -- {torch_u_ini_memory_tensor.size()}')
+        print(f'x_size -- {torch_x_ini_memory_tensor.size()}')
+        print(f'j_size -- {torch_j_ini_memory_tensor.size()}')
+
+        # save data in PT file for training
+        # torch.save(u_data, os.path.join(FOLDER_PATH , f'u_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        # torch.save(x_data, os.path.join(FOLDER_PATH , f'x_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+        # torch.save(j_data, os.path.join(FOLDER_PATH , f'j_data_' + 'idx-' + str(idx_group_of_control_step) + '_test1.pt'))
+
+        # # plots
+        # t = np.arange(0, CONTROL_STEPS*TS, TS) # np.arange(len(joint_states[1])) * panda.opt.timestep
+        # print(f't -- {len(t)}')
+
+        # # plot 1: 5 states
+        # plt.figure()
+        # # for i in range(5):
+        # plt.plot(t, x_ini_memory[:,0], label=f"x")
+        # plt.plot(t, x_ini_memory[:,1], label=f"x_dot")
+        # plt.plot(t, x_ini_memory[:,2], label=f"theta")
+        # plt.plot(t, x_ini_memory[:,3], label=f"theta_dot")
+        # plt.plot(t, x_ini_memory[:,4], label=f"theta_star")
+        # for z in range(CONTROL_STEPS):
+        #         for i in range(5):
+        #             noisy_state_each_ctl_step = x_random_memory[z*NUM_NOISY_DATA:z*NUM_NOISY_DATA+NUM_NOISY_DATA,i]
+        #             for k in range(0,NUM_NOISY_DATA):
+        #                     plt.scatter(t[z], noisy_state_each_ctl_step[k], s = 20, color = 'lightgrey')
+        # plt.scatter(t[CONTROL_STEPS-1], noisy_state_each_ctl_step[0], s = 20, color = 'lightgrey', label=f"noise")
+                
+        # plt.xlabel("Time [s]")
+        # plt.ylabel("state")
+        # plt.legend()
+        # figure_name = 'idx-' + str(idx_group_of_control_step) + '_x_0121' + '.pdf'
+        # figure_path = os.path.join(FOLDER_PATH, figure_name)
+        # plt.savefig(figure_path)
+
+        # # plot 2: u
+        # plt.figure()
+        # plt.plot(t, u_ini_memory[:,0,0], label=f"u")
+        # for z in range(CONTROL_STEPS):
+        #         noisy_u_each_ctl_step = u_random_memory[z*NUM_NOISY_DATA:z*NUM_NOISY_DATA+NUM_NOISY_DATA,0,0]
+        #         for k in range(0, NUM_NOISY_DATA):
+        #             plt.scatter(t[z], noisy_u_each_ctl_step[k], s = 20, color = 'lightgrey')
+        # plt.scatter(t[CONTROL_STEPS-1], noisy_u_each_ctl_step[0], s = 20, color = 'lightgrey', label=f"noise")
+                
+        # plt.xlabel("Time [s]")
+        # plt.ylabel("control input")
+        # plt.legend()
+        # figure_name = 'idx-' + str(idx_group_of_control_step) + '_u_0121' + '.pdf'
+        # figure_path = os.path.join(FOLDER_PATH, figure_name)
+        # plt.savefig(figure_path)
+
+        # # plot 3: cost
+        # plt.figure()
+        # plt.plot(t, j_ini_memory[:,0])
+        # for z in range(CONTROL_STEPS):
+        #         noisy_j_each_ctl_step = j_random_memory[z*NUM_NOISY_DATA:z*NUM_NOISY_DATA+NUM_NOISY_DATA,0]
+        #         for k in range(0, NUM_NOISY_DATA):
+        #             plt.scatter(t[z], noisy_j_each_ctl_step[k], s = 20, color = 'lightgrey')
+        # plt.scatter(t[CONTROL_STEPS-1], noisy_j_each_ctl_step[0], s = 20, color = 'lightgrey', label=f"noise")
+                
+        # plt.xlabel("Time [s]")
+        # plt.ylabel("cost")
+        # plt.legend()
+        # figure_name = 'idx-' + str(idx_group_of_control_step) + '_j_0121' + '.pdf'
+        # figure_path = os.path.join(FOLDER_PATH, figure_name)
+        # plt.savefig(figure_path)
+
+    
+    except Exception as e:
+        print(f"Error: {e}")
+
+
+
+def main():
+    # num_seed = NUM_SEED
+    # ini_data_start_idx = 0
+    # noisy_data_start_idx = NUM_INI_STATES*CONTROL_STEPS
+
+    # initial data generating 50*7, 50*7, 50
+    # ini_0_states, random_ini_u_guess, ini_data_idx = ini_data_generating()
+
+    # memories u,x,j
+
+
+    # memories for data
+    u_ini_memory = np.zeros((1*CONTROL_STEPS, HOR, NUM_U)) # 80 64 1 
+    # u_random_memory = np.zeros((NUM_NOISY_DATA*CONTROL_STEPS, HOR, 1))
+    x_ini_memory = np.zeros((1*CONTROL_STEPS, NUM_X)) 
+    # x_random_memory = np.zeros((NUM_NOISY_DATA*CONTROL_STEPS, 5)) 
+    j_ini_memory = np.zeros((1*CONTROL_STEPS, 1)) 
+    # j_random_memory = np.zeros((NUM_NOISY_DATA*CONTROL_STEPS, 1)) 
+
+    # initial data groups 50
+    argument_each_group = []
+    for idx_ini_guess in range(0, INITIAL_GUESS_NUM): 
+        for turn in range(0,num_datagroup):
+            # initial guess
+            x_ini_guess = initial_guess_x[idx_ini_guess]
+            u_ini_guess = initial_guess_u[idx_ini_guess]
+            idx_group_of_control_step = idx_ini_guess*num_datagroup+turn
+            
+            #initial states
+            theta_1 = rng0[turn,IDX_THETA1_INI]
+            theta_2 = rng0[turn,IDX_THETA2_INI]
+            theta1_star_0 = Theta1ToThetaStar1(theta_1)
+            theta2_star_0 = Theta2ToThetaStar2(theta_2)
+
+            x0 = np.array([theta_1, theta_2, 0, 0, theta1_star_0, theta2_star_0])
+            
+            argument_each_group.append((x_ini_guess, u_ini_guess, idx_group_of_control_step, x0, 
+                                        u_ini_memory, x_ini_memory, j_ini_memory))
+        
+
+    # test_data_group = initial_data_groups[0:2]
+    
+    # (noisy)
+    # for a in range(NUM_INI_STATES):
+    #       for b in range(NOISE_DATA_PER_STATE):
+    #             initial_data_groups.append([ini_noisy_data_u_guess[a,b,:], ini_noisy_states[a,b,:]])
+    
+    #     ini_data_groups_array = np.array(initial_data_groups)
+    #     print(f'initial_data_groups_size -- {ini_data_groups_array.shape}')
+
+    with Pool(processes=MAX_CORE_CPU) as pool:
+          pool.starmap(RunMPCForSingle_IniState_IniGuess, argument_each_group)
+
+
+
+
+
+if __name__ == "__main__":
+    # multiprocessing.set_start_method("spawn")
+    main()
