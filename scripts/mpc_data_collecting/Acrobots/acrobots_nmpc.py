@@ -23,12 +23,12 @@ G = 9.81 # [m/s^2]
 
 
 ##### MPC parameters #####
-N = CONTROL_STEPS = 80
+CONTROL_STEPS = 80
 
 # (for 1 time solving)
-HOR = 64 # mpc prediction horizon
-TS = 0.001
-TF = HOR 
+N = HOR = 64 # mpc prediction horizon
+TS = 0.01
+TF = HOR*TS
 
 NUM_X = 6 # theta1, theta2, theta_1_dot, theta_2_dot, theta_star_1, theta_star_2
 NUM_U = 1 # tau
@@ -142,23 +142,23 @@ def Acrobot_Acado_model():
    u = ca.SX.sym('u', 1)  # u tau
    
    # mass matrix elements
-   m11 = LINK_MOI + LINK_MOI + LINK_MASS_2*LINK_LENGTH_1**2 + 2*LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(x[1])
-   m12 = LINK_MOI + LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(x[1])
-   m21 = LINK_MOI + LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(x[1])
+   m11 = LINK_MOI + LINK_MOI + LINK_MASS_2*LINK_LENGTH_1**2 + 2*LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.cos(x[1])
+   m12 = LINK_MOI + LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.cos(x[1])
+   m21 = LINK_MOI + LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.cos(x[1])
    m22 = LINK_MOI 
 
    Mass = ca.vertcat(
           ca.horzcat(m11, m12),
           ca.horzcat(m21, m22))
-   Mass_inv = ca.inv(Mass)
+   Mass_inv = ca.solve(Mass, ca.SX.eye(2))
    mass_func = ca.Function("mass_det", [x], [ca.det(Mass)])
    test_x = np.array([0, 0, 0, 0, np.pi, 0])
    print("Mass determinant at test x:", mass_func(test_x))
 
    # Coriolis matrix elements  
    c11 = -2*LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(x[1])*x[3]
-   c12 = -LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*x[3]
-   c21 = LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*x[2]
+   c12 = -LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(x[1])*x[3]
+   c21 = LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(x[1])*x[2]
    c22 = 0
 
    Cor = ca.vertcat(
@@ -195,14 +195,18 @@ def Acrobot_Acado_model():
 
         -PI_UNDER_2 * (x[1]-np.pi) * x[3], # theta_2_star_dot
     )
+   
+   x_dot = ca.SX.sym('xdot', 6)
+   f_impl = x_dot - dynam_acrobot
  
    model = AcadosModel()
    model.name = "acrobot_acado"
    model.x    = x
-   model.xdot = ca.SX.sym('xdot', 6)
+   model.xdot = x_dot
    model.u    = u
-   model.p    = []
+   # model.p    = []
    model.f_expl_expr = dynam_acrobot
+   # model.f_impl_expr = f_impl
 
    return model
 
@@ -227,6 +231,11 @@ def Acado_ocp_solver(x0):
    ocp.cost.cost_type_e = 'NONLINEAR_LS'
 
    dyn_func = ca.Function('f', [model.x, model.u], [model.f_expl_expr])
+   for test_theta1 in np.linspace(-np.pi, np.pi, 10):
+    test_x = np.array([test_theta1, 0, 0, 0, 0, 0])
+    test_u = 5
+    val = dyn_func(test_x, test_u)
+    print(test_theta1, val)
    test_x = np.array([0, 0, 0, 0, np.pi, 0])
    test_u = 10
    test_val = dyn_func(test_x, test_u) 
@@ -306,8 +315,8 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
             # ocp_solver.set("yref", X_REF)
             status = ocp_solver.solve()
 
-            ocp.solver_options.print_level = 3
-            ocp_solver.print_statistics()
+            # ocp.solver_options.print_level = 3
+            # ocp_solver.print_statistics()
 
             if status != 0:
                print(f"Solver failed at step {i} with status {status}")
