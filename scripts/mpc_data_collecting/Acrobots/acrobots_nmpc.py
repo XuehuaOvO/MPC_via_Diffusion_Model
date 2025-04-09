@@ -193,7 +193,7 @@ def Acrobot_Acado_model():
 
         -PI_UNDER_2 * (x[0]) * x[2], # theta_1_star_dot
 
-        -PI_UNDER_2 * (x[1]-np.pi) * x[3], # theta_2_star_dot
+        -PI_UNDER_2 * (x[1]-ca.pi) * x[3], # theta_2_star_dot
     )
    
    x_dot = ca.SX.sym('xdot', 6)
@@ -210,6 +210,71 @@ def Acrobot_Acado_model():
 
    return model
 
+def Acrobot_gym_model():
+    x = ca.SX.sym('x', 6)  # x[0] theta_1, x[1] theta_2, x[2] theta_1_dot, x[3] theta_2_dot, x[4] theta_star_1, x[5] theta_star_2
+    u = ca.SX.sym('u', 1)  # u tau
+
+    theta1 = x[0]
+    theta2 = x[1]
+    dtheta1 = x[2]
+    dtheta2 = x[3]
+
+    m1 = LINK_MASS_1
+    m2 = LINK_MASS_2
+    l1 = LINK_LENGTH_1
+    lc1 = LINK_COM_POS_1
+    lc2 = LINK_COM_POS_2
+    I1 = LINK_MOI
+    I2 = LINK_MOI
+    g = 9.8
+
+    d1 = (
+    m1 * lc1**2
+    + m2 * (l1**2 + lc2**2 + 2 * l1 * lc2 * ca.cos(theta2))
+    + I1
+    + I2
+    )
+
+    d2 = m2 * (lc2**2 + l1 * lc2 * ca.cos(theta2)) + I2
+    phi2 = m2 * lc2 * g * ca.cos(theta1 + theta2 - ca.pi / 2.0)
+    phi1 = (
+        -m2 * l1 * lc2 * dtheta2**2 * ca.sin(theta2)
+        - 2 * m2 * l1 * lc2 * dtheta2 * dtheta1 * ca.sin(theta2)
+        + (m1 * lc1 + m2 * l1) * g * ca.cos(theta1 - ca.pi / 2)
+        + phi2
+    )
+
+    ddtheta2 = (u + d2 / d1 * phi1 - phi2) / (m2 * lc2**2 + I2 - d2**2 / d1)
+    ddtheta1 = -(d2 * ddtheta2 + phi1) / d1
+
+    dynam_acrobot = ca.vertcat(
+    dtheta1, # theta_1_dot
+
+    dtheta2, # theta_2_dot
+
+    ddtheta1, # theta_1_ddot
+
+    ddtheta2, # theta_2_ddot
+
+    -PI_UNDER_2 * theta1 * dtheta1, # theta_1_star_dot
+
+    -PI_UNDER_2 * (theta2-ca.pi) * dtheta2, # theta_2_star_dot
+    )
+
+    x_dot = ca.SX.sym('xdot', 6)
+    f_impl = x_dot - dynam_acrobot
+
+    model = AcadosModel()
+    model.name = "acrobot_acado"
+    model.x    = x
+    model.xdot = x_dot
+    model.u    = u
+    # model.p    = []
+    model.f_expl_expr = dynam_acrobot
+    # model.f_impl_expr = f_impl
+
+    return model
+
 ########## create Acado ocp (optimal control problem) solver ##########
 def Acado_ocp_solver(x0):
    ocp = AcadosOcp()
@@ -219,7 +284,7 @@ def Acado_ocp_solver(x0):
    ocp.solver_options.tf = TF
    
    # load acrobot acado model
-   model = Acrobot_Acado_model()
+   model = Acrobot_gym_model()
    ocp.model = model
    ocp.model.x = model.x
    ocp.model.u = model.u
@@ -231,11 +296,11 @@ def Acado_ocp_solver(x0):
    ocp.cost.cost_type_e = 'NONLINEAR_LS'
 
    dyn_func = ca.Function('f', [model.x, model.u], [model.f_expl_expr])
-   for test_theta1 in np.linspace(-np.pi, np.pi, 10):
-    test_x = np.array([test_theta1, 0, 0, 0, 0, 0])
-    test_u = 5
-    val = dyn_func(test_x, test_u)
-    print(test_theta1, val)
+   # for test_theta1 in np.linspace(-np.pi, np.pi, 10):
+    # test_x = np.array([test_theta1, 0, 0, 0, 0, 0])
+    # test_u = 5
+    # val = dyn_func(test_x, test_u)
+    # print(test_theta1, val)
    test_x = np.array([0, 0, 0, 0, np.pi, 0])
    test_u = 10
    test_val = dyn_func(test_x, test_u) 
