@@ -151,6 +151,9 @@ def Acrobot_Acado_model():
           ca.horzcat(m11, m12),
           ca.horzcat(m21, m22))
    Mass_inv = ca.inv(Mass)
+   mass_func = ca.Function("mass_det", [x], [ca.det(Mass)])
+   test_x = np.array([0, 0, 0, 0, np.pi, 0])
+   print("Mass determinant at test x:", mass_func(test_x))
 
    # Coriolis matrix elements  
    c11 = -2*LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(x[1])*x[3]
@@ -223,15 +226,21 @@ def Acado_ocp_solver(x0):
    ocp.cost.cost_type = 'NONLINEAR_LS'
    ocp.cost.cost_type_e = 'NONLINEAR_LS'
 
+   dyn_func = ca.Function('f', [model.x, model.u], [model.f_expl_expr])
+   test_x = np.array([0, 0, 0, 0, np.pi, 0])
+   test_u = 10
+   test_val = dyn_func(test_x, test_u) 
+   print("Dynamics output:", test_val)
+
    
    # weights
    ocp.cost.W = W
-   # ocp.cost.W_0 = W_INI
+   ocp.cost.W_0 = W_INI
    ocp.cost.W_e = W_TERMINAL
 
    # reference state
    ocp.cost.yref = X_REF
-   # ocp.cost.yref_0 = X_REF_INI
+   ocp.cost.yref_0 = X_REF_INI
    ocp.cost.yref_e = X_REF_TERMINAL
 
    # constraints
@@ -292,6 +301,9 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
             # stage 0 of the prediction horizon is the current state
             ocp_solver.set(0, "lbx", X_result[i, :]) 
             ocp_solver.set(0, "ubx", X_result[i, :])
+            for j in range(N):
+                ocp_solver.set(j, "yref", X_REF)
+            # ocp_solver.set("yref", X_REF)
             status = ocp_solver.solve()
 
             ocp.solver_options.print_level = 3
