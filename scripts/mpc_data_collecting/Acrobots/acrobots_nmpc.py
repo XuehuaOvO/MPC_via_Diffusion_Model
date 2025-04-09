@@ -24,7 +24,7 @@ G = 9.81 # [m/s^2]
 
 
 ##### MPC parameters #####
-CONTROL_STEPS = 80
+CONTROL_STEPS = 150
 
 # (for 1 time solving)
 N = 64 # mpc prediction horizon
@@ -37,8 +37,8 @@ IDX_THETA1_INI = 0
 IDX_THETA2_INI = 1
 
 ##### cost function weights #####
-"Q = np.diag([0.1, 0.1, 0.1, 0.1]), R = 0.1, P = np.diag([1, 1, 1, 1])"
-Q = np.diag([ 0.1, 0.1, 0.1, 0.1, 1000, 1000 ])
+"Q = np.diag([0.1, 10, 10, 0.1]), R = 0.1, P = np.diag([1, 1, 1, 1])"
+Q = np.diag([ 0.01, 1, 1, 1, 1, 1])
 R = 1
 # Q, R --> W for Acado ocp
 
@@ -75,7 +75,7 @@ print(f'rng0 -- {rng0.shape}')
 # initial guess
 INITIAL_GUESS_NUM = 2
 initial_guess_x = [np.pi/2, -np.pi/2]
-initial_guess_u = [0.5, -0.5]
+initial_guess_u = [1, -1]
 
 # Theta star
 PI_UNDER_2 = 2/np.pi
@@ -367,9 +367,9 @@ def Acado_ocp_solver(x0):
    # constraints
    ocp.constraints.x0 = x0 # initial states
 
-   # ocp.constraints.idxbx = np.array([0, 1])  # 6 constraints 
-   # ocp.constraints.lbx = np.array([-np.pi, -np.pi]) # np.array([-np.pi, -np.pi, -4*np.pi, -9*np.pi, -np.pi, -np.pi])
-   # ocp.constraints.ubx = np.array([np.pi, np.pi]) # np.array([np.pi, np.pi, 4*np.pi, 9*np.pi, np.pi, np.pi])
+   ocp.constraints.idxbx = np.array([0, 1, 2, 3])  # 6 constraints 
+   ocp.constraints.lbx = np.array([-np.pi, -np.pi, -4*np.pi, -9*np.pi])
+   ocp.constraints.ubx = np.array([np.pi, np.pi, 4*np.pi, 9*np.pi])
 
    ocp.constraints.idxbu = np.array([0])
    ocp.constraints.lbu = np.array([-1])
@@ -419,17 +419,19 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         u_guess = u_ini_guess
     
         # set initial guess
-        # ocp_solver.set(0, "u", u_guess) 
-        # ocp_solver.set(0, "x", x_guess)
+        ocp_solver.set(0, "u", u_guess) 
+        ocp_solver.set(0, "x", x_guess)
+        ocp_solver.set(0, "lbx", x0_state)
+        ocp_solver.set(0, "ubx", x0_state)
 
         # ocp solving
         for i in range(0, CONTROL_STEPS):
 
             # stage 0 of the prediction horizon is the current state
-            # ocp_solver.set(0, "lbx", X_result[i, :]) 
-            # ocp_solver.set(0, "ubx", X_result[i, :])
-            # for j in range(N):
-            #     ocp_solver.set(j, "yref", X_REF)
+            # ocp_solver.set(i, "lbx", x_next) 
+            # ocp_solver.set(i, "ubx", x_next)
+            for j in range(N):
+                ocp_solver.set(j, "yref", np.array([np.pi, 0, 0, 0, 0, 0, 0]))
             # ocp_solver.set("yref", X_REF)
             status = ocp_solver.solve()
 
@@ -444,15 +446,47 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
             U_result[i,:] = u_solve
 
             # state updating
-            integrator.set("x", X_result[i, :])
-            integrator.set("u", u_solve)
-            integrator.solve()
-            x_next = integrator.get("x")
+            # integrator.set("x", X_result[i, :])
+            # integrator.set("u", u_solve)
+            # integrator.solve()
+            # x_next = integrator.get("x")
+            x_next = ocp_solver.get(1, "x")
+            ocp_solver.set(0, "lbx", x_next)
+            ocp_solver.set(0, "ubx", x_next)
 
             X_result[i+1,:] = x_next
         
         print(f'X_result -- {X_result}')
         print(f'U_result -- {U_result}')
+
+        time = np.arange(X_result.shape[0])  # time steps
+
+        fig, axs = plt.subplots(7, 1, figsize=(10, 14), sharex=True)
+
+        state_labels = [
+            'theta1 (rad)',
+            'theta2 (rad)',
+            'dtheta1 (rad/s)',
+            'dtheta2 (rad/s)',
+            'theta1_star',
+            'theta2_star'
+        ]
+
+        # Plot states
+        for i in range(6):
+            axs[i].plot(time, X_result[:, i], label=state_labels[i])
+            axs[i].set_ylabel(state_labels[i])
+            axs[i].grid(True)
+
+        # Plot control input
+        axs[6].plot(time[:-1], U_result[:, 0], label='Torque u', color='r')
+        axs[6].set_ylabel('Control u (Nm)')
+        axs[6].set_xlabel('Time step')
+        axs[6].grid(True)
+
+        plt.suptitle('Acrobot States and Control Input Over Time')
+        # plt.tight_layout(rect=[0, 0.03, 1, 0.97])
+        plt.show()
         
         # noisy at x0
         # MPC_NoiseData_Process(x0_state, x_ini_guess, u_ini_guess, idx_group_of_control_step, u_random_memory, x_random_memory, j_random_memory)
