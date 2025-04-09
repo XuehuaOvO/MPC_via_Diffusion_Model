@@ -27,9 +27,9 @@ G = 9.81 # [m/s^2]
 CONTROL_STEPS = 80
 
 # (for 1 time solving)
-N = HOR = 64 # mpc prediction horizon
+N = 64 # mpc prediction horizon
 TS = 0.01
-TF = HOR*TS
+TF = N*TS
 
 NUM_X = 6 # theta1, theta2, theta_1_dot, theta_2_dot, theta_star_1, theta_star_2
 NUM_U = 1 # tau
@@ -75,7 +75,7 @@ print(f'rng0 -- {rng0.shape}')
 # initial guess
 INITIAL_GUESS_NUM = 2
 initial_guess_x = [np.pi/2, -np.pi/2]
-initial_guess_u = [10, -10]
+initial_guess_u = [0.5, -0.5]
 
 # Theta star
 PI_UNDER_2 = 2/np.pi
@@ -141,9 +141,29 @@ def Acrobot_dynamic_Casadi(x, u) -> ca.vertcat:
 
 ########## define Acado Model ##########
 def Acrobot_Acado_model():
-   x = ca.SX.sym('x', 6)  # x[0] theta_1, x[1] theta_2, x[2] theta_1_dot, x[3] theta_2_dot, x[4] theta_star_1, x[5] theta_star_2
-   u = ca.SX.sym('u', 1)  # u tau
    
+   theta_1 = ca.SX.sym('theta_1')
+   theta_2 = ca.SX.sym('theta_2')
+   dtheta_1 = ca.SX.sym('dtheta_1')
+   dtheta_2 = ca.SX.sym('dtheta_2')
+   theta_1_star = ca.SX.sym('theta_1_star')
+   theta_2_star = ca.SX.sym('theta_2_star')
+   x = ca.vertcat(theta_1, theta_2, dtheta_1, dtheta_2, theta_1_star, theta_2_star)
+
+   F = ca.SX.sym('F')
+   u = ca.vertcat(F)
+
+   theta_1_dot = ca.SX.sym('theta_1_dot')
+   theta_2_dot  = ca.SX.sym('theta_2_dot')
+   dtheta_1_dot  = ca.SX.sym('dtheta_1_dot')
+   dtheta_2_dot  = ca.SX.sym('dtheta_2_dot')
+   theta_1_star_dot  = ca.SX.sym('theta_1_star_dot')
+   theta_2_star_dot  = ca.SX.sym('theta_2_star_dot')
+   xdot = ca.vertcat(theta_1_dot, theta_2_dot, dtheta_1_dot, dtheta_2_dot, theta_1_star_dot, theta_2_star_dot)
+
+   # x = ca.SX.sym('x', 6)  # x[0] theta_1, x[1] theta_2, x[2] theta_1_dot, x[3] theta_2_dot, x[4] theta_star_1, x[5] theta_star_2
+   # u = ca.SX.sym('u', 1)  # u tau
+
    # mass matrix elements
    m11 = LINK_MOI + LINK_MOI + LINK_MASS_2*LINK_LENGTH_1**2 + 2*LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.cos(x[1])
    m12 = LINK_MOI + LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.cos(x[1])
@@ -199,13 +219,13 @@ def Acrobot_Acado_model():
         -PI_UNDER_2 * (x[1]-ca.pi) * x[3], # theta_2_star_dot
     )
    
-   x_dot = ca.SX.sym('xdot', 6)
-   f_impl = x_dot - dynam_acrobot
+   # x_dot = ca.SX.sym('xdot', 6)
+   # f_impl = x_dot - dynam_acrobot
  
    model = AcadosModel()
    model.name = "acrobot_acado"
    model.x    = x
-   model.xdot = x_dot
+   model.xdot = xdot
    model.u    = u
    # model.p    = []
    model.f_expl_expr = dynam_acrobot
@@ -214,83 +234,87 @@ def Acrobot_Acado_model():
    return model
 
 def Acrobot_gym_model():
-    x = ca.SX.sym('x', 6)  # x[0] theta_1, x[1] theta_2, x[2] theta_1_dot, x[3] theta_2_dot, x[4] theta_star_1, x[5] theta_star_2
-    u = ca.SX.sym('u', 1)  # u tau
+   theta1 = ca.SX.sym('theta_1')
+   theta2 = ca.SX.sym('theta_2')
+   dtheta1 = ca.SX.sym('dtheta_1')
+   dtheta2 = ca.SX.sym('dtheta_2')
+   theta_1_star = ca.SX.sym('theta_1_star')
+   theta_2_star = ca.SX.sym('theta_2_star')
+   x = ca.vertcat(theta1, theta2, dtheta1, dtheta2, theta_1_star, theta_2_star)
 
-    theta1 = x[0]
-    theta2 = x[1]
-    dtheta1 = x[2]
-    dtheta2 = x[3]
+   F = ca.SX.sym('F')
+   u = ca.vertcat(F)
 
-    m1 = LINK_MASS_1
-    m2 = LINK_MASS_2
-    l1 = LINK_LENGTH_1
-    lc1 = LINK_COM_POS_1
-    lc2 = LINK_COM_POS_2
-    I1 = LINK_MOI
-    I2 = LINK_MOI
-    g = 9.8
+   theta_1_dot = ca.SX.sym('theta_1_dot')
+   theta_2_dot  = ca.SX.sym('theta_2_dot')
+   dtheta_1_dot  = ca.SX.sym('dtheta_1_dot')
+   dtheta_2_dot  = ca.SX.sym('dtheta_2_dot')
+   theta_1_star_dot  = ca.SX.sym('theta_1_star_dot')
+   theta_2_star_dot  = ca.SX.sym('theta_2_star_dot')
+   xdot = ca.vertcat(theta_1_dot, theta_2_dot, dtheta_1_dot, dtheta_2_dot, theta_1_star_dot, theta_2_star_dot)
 
-    d1 = (
-    m1 * lc1**2
-    + m2 * (l1**2 + lc2**2 + 2 * l1 * lc2 * ca.cos(theta2))
-    + I1
-    + I2
-    )
+   # x = ca.SX.sym('x', 6)  # x[0] theta_1, x[1] theta_2, x[2] theta_1_dot, x[3] theta_2_dot, x[4] theta_star_1, x[5] theta_star_2
+   # u = ca.SX.sym('u', 1)  # u tau
 
-    d2 = m2 * (lc2**2 + l1 * lc2 * ca.cos(theta2)) + I2
-    phi2 = m2 * lc2 * g * ca.cos(theta1 + theta2 - ca.pi / 2.0)
-    phi1 = (
-        -m2 * l1 * lc2 * dtheta2**2 * ca.sin(theta2)
-        - 2 * m2 * l1 * lc2 * dtheta2 * dtheta1 * ca.sin(theta2)
-        + (m1 * lc1 + m2 * l1) * g * ca.cos(theta1 - ca.pi / 2)
-        + phi2
-    )
+   # theta1 = x[0]
+   # theta2 = x[1]
+   # dtheta1 = x[2]
+   # dtheta2 = x[3]
 
-    ddtheta2 = (u + d2 / d1 * phi1 - phi2) / (m2 * lc2**2 + I2 - d2**2 / d1)
-    ddtheta1 = -(d2 * ddtheta2 + phi1) / d1
+   m1 = LINK_MASS_1
+   m2 = LINK_MASS_2
+   l1 = LINK_LENGTH_1
+   lc1 = LINK_COM_POS_1
+   lc2 = LINK_COM_POS_2
+   I1 = LINK_MOI
+   I2 = LINK_MOI
+   g = 9.8
 
-    dynam_acrobot = ca.vertcat(
-    dtheta1, # theta_1_dot
+   d1 = m1 * lc1**2 + m2 * (l1**2 + lc2**2 + 2 * l1 * lc2 * ca.cos(theta2))+ I1 + I2
 
-    dtheta2, # theta_2_dot
+   d2 = m2 * (lc2**2 + l1 * lc2 * ca.cos(theta2)) + I2
+   phi2 = m2 * lc2 * g * ca.cos(theta1 + theta2 - ca.pi / 2.0)
+   phi1 = -m2 * l1 * lc2 * dtheta2**2 * ca.sin(theta2) - 2 * m2 * l1 * lc2 * dtheta2 * dtheta1 * ca.sin(theta2) + (m1 * lc1 + m2 * l1) * g * ca.cos(theta1 - ca.pi / 2) + phi2
 
-    ddtheta1, # theta_1_ddot
+   ddtheta2 = (F + d2 / d1 * phi1 - phi2) / (m2 * lc2**2 + I2 - d2**2 / d1)
+   ddtheta1 = -(d2 * ddtheta2 + phi1) / d1
 
-    ddtheta2, # theta_2_ddot
+   f_expl = ca.vertcat(
+       dtheta1, # theta_1_dot
+       dtheta2, # theta_2_dot
+       ddtheta1, # theta_1_ddot
+       ddtheta2, # theta_2_ddot
+       -PI_UNDER_2 * theta1 * dtheta1, # theta_1_star_dot
+       -PI_UNDER_2 * (theta2-ca.pi) * dtheta2, # theta_2_star_dot
+       )
 
-    -PI_UNDER_2 * theta1 * dtheta1, # theta_1_star_dot
+   # x_dot = ca.SX.sym('xdot', 6)
+   f_impl = xdot - f_expl
 
-    -PI_UNDER_2 * (theta2-ca.pi) * dtheta2, # theta_2_star_dot
-    )
+   model = AcadosModel()
+   model.name = "acrobot_acado"
+   model.x    = x
+   model.xdot = xdot
+   model.u    = u
+   model.f_expl_expr = f_expl
+   model.f_impl_expr = f_impl
 
-    x_dot = ca.SX.sym('xdot', 6)
-    f_impl = x_dot - dynam_acrobot
-
-    model = AcadosModel()
-    model.name = "acrobot_acado"
-    model.x    = x
-    model.xdot = x_dot
-    model.u    = u
-    # model.p    = []
-    model.f_expl_expr = dynam_acrobot
-    # model.f_impl_expr = f_impl
-
-    return model
+   return model
 
 ########## create Acado ocp (optimal control problem) solver ##########
 def Acado_ocp_solver(x0):
    ocp = AcadosOcp()
    
    # ocp solver
-   ocp.solver_options.N_horizon = CONTROL_STEPS
+   ocp.solver_options.N_horizon = N
    ocp.solver_options.tf = TF
    
    # load acrobot acado model
    model = Acrobot_gym_model()
    ocp.model = model
-   ocp.model.x = model.x
-   ocp.model.u = model.u
+
+   # ocp.model.x = model.x
+   # ocp.model.u = model.u
    ocp.model.cost_y_expr = ca.vertcat(model.x, model.u) # Define cost function expression (GPT)
    ocp.model.cost_y_expr_e = model.x # terminal cost 
 
@@ -318,7 +342,7 @@ def Acado_ocp_solver(x0):
    
    # weights
    ocp.cost.W = W
-   ocp.cost.W_0 = W_INI
+   # ocp.cost.W_0 = W_INI
    ocp.cost.W_e = W_TERMINAL
  
    # y = V_x*x + Vu*u
@@ -337,15 +361,15 @@ def Acado_ocp_solver(x0):
 
    # reference state
    ocp.cost.yref = X_REF
-   ocp.cost.yref_0 = X_REF_INI
+   # ocp.cost.yref_0 = X_REF_INI
    ocp.cost.yref_e = X_REF_TERMINAL
 
    # constraints
    ocp.constraints.x0 = x0 # initial states
 
-   ocp.constraints.idxbx = np.array([0, 1])  # 6 constraints 
-   ocp.constraints.lbx = np.array([-np.pi, -np.pi]) # np.array([-np.pi, -np.pi, -4*np.pi, -9*np.pi, -np.pi, -np.pi])
-   ocp.constraints.ubx = np.array([np.pi, np.pi]) # np.array([np.pi, np.pi, 4*np.pi, 9*np.pi, np.pi, np.pi])
+   # ocp.constraints.idxbx = np.array([0, 1])  # 6 constraints 
+   # ocp.constraints.lbx = np.array([-np.pi, -np.pi]) # np.array([-np.pi, -np.pi, -4*np.pi, -9*np.pi, -np.pi, -np.pi])
+   # ocp.constraints.ubx = np.array([np.pi, np.pi]) # np.array([np.pi, np.pi, 4*np.pi, 9*np.pi, np.pi, np.pi])
 
    ocp.constraints.idxbu = np.array([0])
    ocp.constraints.lbu = np.array([-1])
@@ -355,8 +379,9 @@ def Acado_ocp_solver(x0):
    ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
    ocp.solver_options.hessian_approx = 'GAUSS_NEWTON'
    ocp.solver_options.integrator_type = 'IRK'
-   ocp.solver_options.nlp_solver_type = 'SQP'
-   ocp.solver_options.nlp_solver_max_iter = 200
+   # ocp.solver_options.nlp_solver_type = 'SQP'
+   # ocp.solver_options.nlp_solver_max_iter = 10
+   ocp.solver_options.sim_method_newton_iter = 10
 
    # build solver
    acados_solver = AcadosOcpSolver(ocp, json_file="acados_ocp_acrobots.json")
@@ -394,17 +419,17 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         u_guess = u_ini_guess
     
         # set initial guess
-        ocp_solver.set(0, "u", u_guess) 
-        ocp_solver.set(0, "x", x_guess)
+        # ocp_solver.set(0, "u", u_guess) 
+        # ocp_solver.set(0, "x", x_guess)
 
         # ocp solving
         for i in range(0, CONTROL_STEPS):
 
             # stage 0 of the prediction horizon is the current state
-            ocp_solver.set(0, "lbx", X_result[i, :]) 
-            ocp_solver.set(0, "ubx", X_result[i, :])
-            for j in range(N):
-                ocp_solver.set(j, "yref", X_REF)
+            # ocp_solver.set(0, "lbx", X_result[i, :]) 
+            # ocp_solver.set(0, "ubx", X_result[i, :])
+            # for j in range(N):
+            #     ocp_solver.set(j, "yref", X_REF)
             # ocp_solver.set("yref", X_REF)
             status = ocp_solver.solve()
 
@@ -552,7 +577,7 @@ def main():
 
 
     # memories for data
-    u_ini_memory = np.zeros((1*CONTROL_STEPS, HOR, NUM_U)) # 80 64 1 
+    u_ini_memory = np.zeros((1*CONTROL_STEPS, N, NUM_U)) # 80 64 1 
     # u_random_memory = np.zeros((NUM_NOISY_DATA*CONTROL_STEPS, HOR, 1))
     x_ini_memory = np.zeros((1*CONTROL_STEPS, NUM_X)) 
     # x_random_memory = np.zeros((NUM_NOISY_DATA*CONTROL_STEPS, 5)) 
