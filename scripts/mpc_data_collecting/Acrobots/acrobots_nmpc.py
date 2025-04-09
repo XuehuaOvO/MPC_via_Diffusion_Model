@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import time
 from multiprocessing import Pool, Manager, Array
 import multiprocessing
+import scipy.linalg
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver, AcadosSimSolver
 
 MAX_CORE_CPU = 1  # 16
@@ -37,14 +38,16 @@ IDX_THETA2_INI = 1
 
 ##### cost function weights #####
 "Q = np.diag([0.1, 0.1, 0.1, 0.1]), R = 0.1, P = np.diag([1, 1, 1, 1])"
+Q = np.diag([ 0.1, 0.1, 0.1, 0.1, 1000, 1000 ])
+R = 1
 # Q, R --> W for Acado ocp
 
 # intermediate weights
-W = np.diag([1e-5, 1e-5, 1e-5, 1e-5, 1e-1, 1e-1, 1e-3]) # 6 states + 1 control input
+W = scipy.linalg.block_diag(Q, R) # 6 states + 1 control input
 # terminal weights
-W_TERMINAL = np.diag([1e-5, 1e-5, 1e-5, 1e-5, 1e-1, 1e-1]) # 6 states
+W_TERMINAL = Q # 6 states
 # initial weights
-W_INI = np.diag([1e-5, 1e-5, 1e-5, 1e-5, 1e-1, 1e-1, 1e-3]) # 6 states + 1 control input
+W_INI = scipy.linalg.block_diag(Q, R) # 6 states + 1 control input
 
 # reference state
 X_REF = np.array([np.pi, 0, 0, 0, 0, 0, 0]) # 6 states + 1 u, (7,)
@@ -291,6 +294,12 @@ def Acado_ocp_solver(x0):
    ocp.model.cost_y_expr = ca.vertcat(model.x, model.u) # Define cost function expression (GPT)
    ocp.model.cost_y_expr_e = model.x # terminal cost 
 
+   # set dimensions
+   nx = model.x.rows()
+   nu = model.u.rows()
+   ny = nx + nu
+   ny_e = nx
+
    # cost function
    ocp.cost.cost_type = 'NONLINEAR_LS'
    ocp.cost.cost_type_e = 'NONLINEAR_LS'
@@ -311,6 +320,20 @@ def Acado_ocp_solver(x0):
    ocp.cost.W = W
    ocp.cost.W_0 = W_INI
    ocp.cost.W_e = W_TERMINAL
+ 
+   # y = V_x*x + Vu*u
+   Vx = np.zeros((ny, nx)) # 7*6
+   Vx[:nx, :nx] = np.eye(nx)
+   ocp.cost.Vx = Vx
+
+   Vu = np.zeros((ny, nu)) # 7*1
+   Vu[-1, 0] = 1.0
+   ocp.cost.Vu = Vu
+
+   # y_e = Vxe*x_e
+   Vx_e = np.zeros((ny_e, nx)) #6*6
+   Vx_e[:nx, :nx] = np.eye(nx)
+   ocp.cost.Vx_e = Vx_e
 
    # reference state
    ocp.cost.yref = X_REF
@@ -319,16 +342,21 @@ def Acado_ocp_solver(x0):
 
    # constraints
    ocp.constraints.x0 = x0 # initial states
-   ocp.constraints.idxbx = np.arange(NUM_X)  # 6 constraints 
-   ocp.constraints.ubx = np.array([np.pi, np.pi, 4*np.pi, 9*np.pi, np.pi, np.pi])
-   ocp.constraints.lbx = np.array([-np.pi, -np.pi, -4*np.pi, -9*np.pi, -np.pi, -np.pi])
+
+   ocp.constraints.idxbx = np.array([0, 1])  # 6 constraints 
+   ocp.constraints.lbx = np.array([-np.pi, -np.pi]) # np.array([-np.pi, -np.pi, -4*np.pi, -9*np.pi, -np.pi, -np.pi])
+   ocp.constraints.ubx = np.array([np.pi, np.pi]) # np.array([np.pi, np.pi, 4*np.pi, 9*np.pi, np.pi, np.pi])
+
+   ocp.constraints.idxbu = np.array([0])
+   ocp.constraints.lbu = np.array([-1])
+   ocp.constraints.ubu = np.array([1])
 
    # solver setting
    ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
    ocp.solver_options.hessian_approx = 'GAUSS_NEWTON'
    ocp.solver_options.integrator_type = 'IRK'
    ocp.solver_options.nlp_solver_type = 'SQP'
-   # ocp.solver_options.nlp_solver_max_iter = 200
+   ocp.solver_options.nlp_solver_max_iter = 200
 
    # build solver
    acados_solver = AcadosOcpSolver(ocp, json_file="acados_ocp_acrobots.json")
