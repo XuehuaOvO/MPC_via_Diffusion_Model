@@ -21,10 +21,11 @@ LINK_COM_POS_1 = 0.5  #: [m] position of the center of mass of link 1
 LINK_COM_POS_2 = 0.5  #: [m] position of the center of mass of link 2
 LINK_MOI = 1.0  #: moments of inertia for both links
 G = 9.81 # [m/s^2]
+U_BOUND = 10
 
 
 ##### MPC parameters #####
-CONTROL_STEPS = 150
+CONTROL_STEPS = 200
 
 # (for 1 time solving)
 N = 64 # mpc prediction horizon
@@ -36,9 +37,12 @@ NUM_U = 1 # tau
 IDX_THETA1_INI = 0
 IDX_THETA2_INI = 1
 
+X_GUESS = [np.pi/2, -np.pi/2]
+U_GUESS = [5, -5]
+
 ##### cost function weights #####
 "Q = np.diag([0.1, 10, 10, 0.1]), R = 0.1, P = np.diag([1, 1, 1, 1])"
-Q = np.diag([ 0.01, 1, 1, 1, 1, 1])
+Q = np.diag([0.1, 0.1, 1, 1, 10, 10])
 R = 1
 # Q, R --> W for Acado ocp
 
@@ -74,8 +78,8 @@ print(f'rng0 -- {rng0.shape}')
 
 # initial guess
 INITIAL_GUESS_NUM = 2
-initial_guess_x = [np.pi/2, -np.pi/2]
-initial_guess_u = [1, -1]
+initial_guess_x = X_GUESS
+initial_guess_u = U_GUESS
 
 # Theta star
 PI_UNDER_2 = 2/np.pi
@@ -165,23 +169,23 @@ def Acrobot_Acado_model():
    # u = ca.SX.sym('u', 1)  # u tau
 
    # mass matrix elements
-   m11 = LINK_MOI + LINK_MOI + LINK_MASS_2*LINK_LENGTH_1**2 + 2*LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.cos(x[1])
-   m12 = LINK_MOI + LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.cos(x[1])
-   m21 = LINK_MOI + LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.cos(x[1])
+   m11 = LINK_MOI + LINK_MOI + LINK_MASS_2*LINK_LENGTH_1**2 + 2*LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.cos(theta_2)
+   m12 = LINK_MOI + LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.cos(theta_2)
+   m21 = LINK_MOI + LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.cos(theta_2)
    m22 = LINK_MOI 
 
    Mass = ca.vertcat(
           ca.horzcat(m11, m12),
           ca.horzcat(m21, m22))
    Mass_inv = ca.solve(Mass, ca.SX.eye(2))
-   mass_func = ca.Function("mass_det", [x], [ca.det(Mass)])
-   test_x = np.array([0, 0, 0, 0, np.pi, 0])
-   print("Mass determinant at test x:", mass_func(test_x))
+   # mass_func = ca.Function("mass_det", [x], [ca.det(Mass)])
+   # test_x = np.array([0, 0, 0, 0, np.pi, 0])
+   # print("Mass determinant at test x:", mass_func(test_x))
 
    # Coriolis matrix elements  
-   c11 = -2*LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(x[1])*x[3]
-   c12 = -LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(x[1])*x[3]
-   c21 = LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(x[1])*x[2]
+   c11 = -2*LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(theta_2)*dtheta_2
+   c12 = -LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(theta_2)*dtheta_2
+   c21 = LINK_MASS_2*LINK_LENGTH_1*LINK_COM_POS_2*ca.sin(theta_2)*dtheta_1
    c22 = 0
 
    Cor = ca.vertcat(
@@ -189,36 +193,31 @@ def Acrobot_Acado_model():
           ca.horzcat(c21, c22))
    
    # gravitational torque matrix elements
-   taug1 = -LINK_MASS_1*G*LINK_COM_POS_1*ca.sin(x[0]) - LINK_MASS_2*G*(LINK_LENGTH_1*ca.sin(x[0]) + LINK_COM_POS_2*ca.sin(x[0] + x[1]))
-   taug2 = -LINK_MASS_2*G*LINK_COM_POS_2*ca.sin(x[0] + x[1])
+   taug1 = -LINK_MASS_1*G*LINK_COM_POS_1*ca.sin(theta_1) - LINK_MASS_2*G*(LINK_LENGTH_1*ca.sin(theta_1) + LINK_COM_POS_2*ca.sin(theta_1 + theta_2))
+   taug2 = -LINK_MASS_2*G*LINK_COM_POS_2*ca.sin(theta_1 + theta_2)
 
    Taug = ca.vertcat(taug1,
                      taug2)
    
    # B matrix
-   B_u = ca.vertcat(0, u)
+   B_u = ca.vertcat(0, F)
    # B_matrix = ca.SX([[0],[1]])
    
    # calculate theta_ddot
-   theta_dot = ca.vertcat(x[2], x[3])
+   theta_dot = ca.vertcat(dtheta_1, dtheta_2)
    
    theta_ddot = Mass_inv@(Taug + B_u - Cor@theta_dot)
    # print("theta_ddot shape:", theta_ddot.shape)
 
-   dynam_acrobot = ca.vertcat(
-        x[2], # theta_1_dot
-
-        x[3], # theta_2_dot
-
+   f_expl = ca.vertcat(
+        dtheta_1, # theta_1_dot
+        dtheta_2, # theta_2_dot
         theta_ddot[0], # theta_1_ddot
-
         theta_ddot[1], # theta_2_ddot
-
-        -PI_UNDER_2 * (x[0]) * x[2], # theta_1_star_dot
-
-        -PI_UNDER_2 * (x[1]-ca.pi) * x[3], # theta_2_star_dot
+        -PI_UNDER_2 * (theta_1) * dtheta_1, # theta_1_star_dot
+        -PI_UNDER_2 * (theta_2-ca.pi) * dtheta_2, # theta_2_star_dot
     )
-   
+   f_impl = xdot - f_expl
    # x_dot = ca.SX.sym('xdot', 6)
    # f_impl = x_dot - dynam_acrobot
  
@@ -228,8 +227,8 @@ def Acrobot_Acado_model():
    model.xdot = xdot
    model.u    = u
    # model.p    = []
-   model.f_expl_expr = dynam_acrobot
-   # model.f_impl_expr = f_impl
+   model.f_expl_expr = f_expl
+   model.f_impl_expr = f_impl
 
    return model
 
@@ -310,7 +309,7 @@ def Acado_ocp_solver(x0):
    ocp.solver_options.tf = TF
    
    # load acrobot acado model
-   model = Acrobot_gym_model()
+   model = Acrobot_Acado_model()
    ocp.model = model
 
    # ocp.model.x = model.x
@@ -367,13 +366,13 @@ def Acado_ocp_solver(x0):
    # constraints
    ocp.constraints.x0 = x0 # initial states
 
-   ocp.constraints.idxbx = np.array([0, 1, 2, 3])  # 6 constraints 
-   ocp.constraints.lbx = np.array([-np.pi, -np.pi, -4*np.pi, -9*np.pi])
-   ocp.constraints.ubx = np.array([np.pi, np.pi, 4*np.pi, 9*np.pi])
+   ocp.constraints.idxbx = np.array([0, 1])  # 2 constraints 
+   ocp.constraints.lbx = np.array([-2*np.pi, -2*np.pi]) # , -4*np.pi, -9*np.pi
+   ocp.constraints.ubx = np.array([2*np.pi, 2*np.pi]) # , 4*np.pi, 9*np.pi
 
    ocp.constraints.idxbu = np.array([0])
-   ocp.constraints.lbu = np.array([-1])
-   ocp.constraints.ubu = np.array([1])
+   ocp.constraints.lbu = np.array([-U_BOUND])
+   ocp.constraints.ubu = np.array([U_BOUND])
 
    # solver setting
    ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
@@ -461,7 +460,7 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
 
         time = np.arange(X_result.shape[0])  # time steps
 
-        fig, axs = plt.subplots(7, 1, figsize=(10, 14), sharex=True)
+        fig, axs = plt.subplots(7, 1, figsize=(6, 10), sharex=True)
 
         state_labels = [
             'theta1 (rad)',
