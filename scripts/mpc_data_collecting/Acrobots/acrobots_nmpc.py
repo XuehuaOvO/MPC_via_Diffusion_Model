@@ -21,14 +21,14 @@ LINK_COM_POS_1 = 0.5  #: [m] position of the center of mass of link 1
 LINK_COM_POS_2 = 0.5  #: [m] position of the center of mass of link 2
 LINK_MOI = 1.0  #: moments of inertia for both links
 G = 9.81 # [m/s^2]
-U_BOUND = 10
+U_BOUND = 20
 
 
 ##### MPC parameters #####
-CONTROL_STEPS = 200
+CONTROL_STEPS = 300
 
 # (for 1 time solving)
-N = 64 # mpc prediction horizon
+N = 128 # mpc prediction horizon
 TS = 0.01
 TF = N*TS
 
@@ -37,19 +37,20 @@ NUM_U = 1 # tau
 IDX_THETA1_INI = 0
 IDX_THETA2_INI = 1
 
-X_GUESS = [np.pi/2, -np.pi/2]
-U_GUESS = [5, -5]
+X_GUESS = [-np.pi, np.pi]
+U_GUESS = [-15, 15]
 
 ##### cost function weights #####
 "Q = np.diag([0.1, 10, 10, 0.1]), R = 0.1, P = np.diag([1, 1, 1, 1])"
-Q = np.diag([0.1, 0.1, 1, 1, 10, 10])
-R = 1
+Q = np.diag([0.01, 0.01, 1, 1, 10, 10])
+Q_E = np.diag([0.01, 0.01, 10, 10, 100, 100])
+R = 0.1
 # Q, R --> W for Acado ocp
 
 # intermediate weights
 W = scipy.linalg.block_diag(Q, R) # 6 states + 1 control input
 # terminal weights
-W_TERMINAL = Q # 6 states
+W_TERMINAL = Q_E # 6 states
 # initial weights
 W_INI = scipy.linalg.block_diag(Q, R) # 6 states + 1 control input
 
@@ -333,10 +334,10 @@ def Acado_ocp_solver(x0):
     # test_u = 5
     # val = dyn_func(test_x, test_u)
     # print(test_theta1, val)
-   test_x = np.array([0, 0, 0, 0, np.pi, 0])
-   test_u = 10
-   test_val = dyn_func(test_x, test_u) 
-   print("Dynamics output:", test_val)
+   # test_x = np.array([0, 0, 0, 0, np.pi, 0])
+   # test_u = 10
+   # test_val = dyn_func(test_x, test_u) 
+   # print("Dynamics output:", test_val)
 
    
    # weights
@@ -366,13 +367,14 @@ def Acado_ocp_solver(x0):
    # constraints
    ocp.constraints.x0 = x0 # initial states
 
-   ocp.constraints.idxbx = np.array([0, 1])  # 2 constraints 
+    
    ocp.constraints.lbx = np.array([-2*np.pi, -2*np.pi]) # , -4*np.pi, -9*np.pi
    ocp.constraints.ubx = np.array([2*np.pi, 2*np.pi]) # , 4*np.pi, 9*np.pi
+   ocp.constraints.idxbx = np.array([0, 1])  # 2 constraints
 
-   ocp.constraints.idxbu = np.array([0])
    ocp.constraints.lbu = np.array([-U_BOUND])
    ocp.constraints.ubu = np.array([U_BOUND])
+   ocp.constraints.idxbu = np.array([0])
 
    # solver setting
    ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
@@ -431,6 +433,7 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
             # ocp_solver.set(i, "ubx", x_next)
             for j in range(N):
                 ocp_solver.set(j, "yref", np.array([np.pi, 0, 0, 0, 0, 0, 0]))
+            ocp_solver.set(N, "yref", np.array([np.pi, 0, 0, 0, 0, 0]))
             # ocp_solver.set("yref", X_REF)
             status = ocp_solver.solve()
 
@@ -441,7 +444,6 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
                print(f"Solver failed at step {i} with status {status}")
 
             u_solve = ocp_solver.get(0, "u")  
-
             U_result[i,:] = u_solve
 
             # state updating
