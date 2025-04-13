@@ -11,6 +11,7 @@ import scipy.linalg
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver, AcadosSimSolver
 
 MAX_CORE_CPU = 1  # 16
+FOLDER_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/mpc_data_collecting/Acrobots'
 
 ##### Acrobot Parameters (Gym) #####
 LINK_LENGTH_1 = 1.0  # [m]
@@ -38,12 +39,12 @@ IDX_THETA1_INI = 0
 IDX_THETA2_INI = 1
 
 X_GUESS = [-np.pi, np.pi]
-U_GUESS = [-15, 15]
+U_GUESS = [-20, 20]
 
 ##### cost function weights #####
 "Q = np.diag([0.1, 10, 10, 0.1]), R = 0.1, P = np.diag([1, 1, 1, 1])"
-Q = np.diag([0.01, 0.01, 1, 1, 10, 10])
-Q_E = np.diag([0.01, 0.01, 10, 10, 100, 100])
+Q = np.diag([0.1, 0.1, 10, 10]) # np.diag([0.01, 0.01, 1, 1, 10, 10])   np.diag([1, 1, 10, 10])
+Q_E = np.diag([1, 1, 1000, 1000])  # np.diag([0.01, 0.01, 10, 10, 1000, 1000])   np.diag([10, 10, 1000, 1000])
 R = 0.1
 # Q, R --> W for Acado ocp
 
@@ -55,9 +56,9 @@ W_TERMINAL = Q_E # 6 states
 W_INI = scipy.linalg.block_diag(Q, R) # 6 states + 1 control input
 
 # reference state
-X_REF = np.array([np.pi, 0, 0, 0, 0, 0, 0]) # 6 states + 1 u, (7,)
-X_REF_TERMINAL = np.array([np.pi, 0, 0, 0, 0, 0]) # 6 states
-X_REF_INI= np.array([np.pi, 0, 0, 0, 0, 0, 0, 0]) # 6 states + 1 u
+X_REF = np.array([0, 0, 0, 0, 0]) # 6 states + 1 u, (7,) X_REF = np.array([np.pi, 0, 0, 0, 0, 0, 0])   np.array([0, 0, 0, 0, 0])
+X_REF_TERMINAL = np.array([0, 0, 0, 0]) # 6 states X_REF = np.array([np.pi, 0, 0, 0, 0, 0])    np.array([0, 0, 0, 0])
+# X_REF_INI= np.array([np.pi, 0, 0, 0, 0, 0, 0, 0]) # 6 states + 1 u
 
 # initial data range
 NUM_INITIAL_THETA1 = 2
@@ -315,8 +316,8 @@ def Acado_ocp_solver(x0):
 
    # ocp.model.x = model.x
    # ocp.model.u = model.u
-   ocp.model.cost_y_expr = ca.vertcat(model.x, model.u) # Define cost function expression (GPT)
-   ocp.model.cost_y_expr_e = model.x # terminal cost 
+   ocp.model.cost_y_expr = ocp.model.cost_y_expr = ca.vertcat(model.x[2], model.x[3], model.x[4], model.x[5], model.u)# ca.vertcat(model.x, model.u)    ocp.model.cost_y_expr = ca.vertcat(model.x[2], model.x[3], model.x[4], model.x[5], model.u)
+   ocp.model.cost_y_expr_e = ca.vertcat(model.x[2], model.x[3], model.x[4], model.x[5]) # terminal cost   model.x    ca.vertcat(model.x[2], model.x[3], model.x[4], model.x[5])
 
    # set dimensions
    nx = model.x.rows()
@@ -325,8 +326,8 @@ def Acado_ocp_solver(x0):
    ny_e = nx
 
    # cost function
-   ocp.cost.cost_type = 'NONLINEAR_LS'
-   ocp.cost.cost_type_e = 'NONLINEAR_LS'
+   ocp.cost.cost_type = 'LINEAR_LS'
+   ocp.cost.cost_type_e = 'LINEAR_LS'
 
    dyn_func = ca.Function('f', [model.x, model.u], [model.f_expl_expr])
    # for test_theta1 in np.linspace(-np.pi, np.pi, 10):
@@ -346,17 +347,36 @@ def Acado_ocp_solver(x0):
    ocp.cost.W_e = W_TERMINAL
  
    # y = V_x*x + Vu*u
-   Vx = np.zeros((ny, nx)) # 7*6
-   Vx[:nx, :nx] = np.eye(nx)
+   # Vx = np.zeros((ny, nx)) # 7*6
+   # Vx[:nx, :nx] = np.eye(nx)
+   # ocp.cost.Vx = Vx
+
+   Vx = np.zeros((ny-2, nx)) # 5*6
+   Vx[0, 2] = 1.0
+   Vx[1, 3] = 1.0
+   Vx[2, 4] = 1.0
+   Vx[3, 5] = 1.0
    ocp.cost.Vx = Vx
 
-   Vu = np.zeros((ny, nu)) # 7*1
+   # Vu = np.zeros((ny, nu)) # 7*1
+   # Vu[-1, 0] = 1.0
+   # ocp.cost.Vu = Vu
+
+   Vu = np.zeros((ny-2, nu)) # 7*1
    Vu[-1, 0] = 1.0
    ocp.cost.Vu = Vu
 
    # y_e = Vxe*x_e
-   Vx_e = np.zeros((ny_e, nx)) #6*6
-   Vx_e[:nx, :nx] = np.eye(nx)
+   
+   # Vx_e = np.zeros((ny_e, nx)) #6*6
+   # Vx_e[:nx, :nx] = np.eye(nx)
+   # ocp.cost.Vx_e = Vx_e
+
+   Vx_e = np.zeros((ny_e-2, nx)) #6*6
+   Vx_e[0, 2] = 1.0
+   Vx_e[1, 3] = 1.0
+   Vx_e[2, 4] = 1.0
+   Vx_e[3, 5] = 1.0
    ocp.cost.Vx_e = Vx_e
 
    # reference state
@@ -427,13 +447,12 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
 
         # ocp solving
         for i in range(0, CONTROL_STEPS):
-
             # stage 0 of the prediction horizon is the current state
             # ocp_solver.set(i, "lbx", x_next) 
             # ocp_solver.set(i, "ubx", x_next)
             for j in range(N):
-                ocp_solver.set(j, "yref", np.array([np.pi, 0, 0, 0, 0, 0, 0]))
-            ocp_solver.set(N, "yref", np.array([np.pi, 0, 0, 0, 0, 0]))
+                ocp_solver.set(j, "yref", np.array([0, 0, 0, 0, 0])) # np.array([np.pi, 0, 0, 0, 0, 0, 0])   np.array([0, 0, 0, 0, 0])
+            ocp_solver.set(N, "yref", np.array([0, 0, 0, 0])) # np.array([np.pi, 0, 0, 0, 0, 0, 0])    np.array([0, 0, 0, 0])
             # ocp_solver.set("yref", X_REF)
             status = ocp_solver.solve()
 
@@ -454,11 +473,13 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
             x_next = ocp_solver.get(1, "x")
             ocp_solver.set(0, "lbx", x_next)
             ocp_solver.set(0, "ubx", x_next)
-
+       
             X_result[i+1,:] = x_next
+            if i+1 <= N:
+               ocp_solver.set(i+1, "x", x_guess)
         
-        print(f'X_result -- {X_result}')
-        print(f'U_result -- {U_result}')
+        print(f'X_last_result -- {X_result[-1,:]}')
+        print(f'U_last_result -- {U_result[-1,:]}')
 
         time = np.arange(X_result.shape[0])  # time steps
 
@@ -486,6 +507,10 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         axs[6].grid(True)
 
         plt.suptitle('Acrobot States and Control Input Over Time')
+        plt.legend()
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_test' + '.pdf'
+        figure_path = os.path.join(FOLDER_PATH, figure_name)
+        plt.savefig(figure_path)
         # plt.tight_layout(rect=[0, 0.03, 1, 0.97])
         plt.show()
         
