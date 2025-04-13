@@ -22,14 +22,14 @@ LINK_COM_POS_1 = 0.5  #: [m] position of the center of mass of link 1
 LINK_COM_POS_2 = 0.5  #: [m] position of the center of mass of link 2
 LINK_MOI = 1.0  #: moments of inertia for both links
 G = 9.81 # [m/s^2]
-U_BOUND = 20
+U_BOUND = 50
 
 
 ##### MPC parameters #####
-CONTROL_STEPS = 300
+CONTROL_STEPS = 400
 
 # (for 1 time solving)
-N = 128 # mpc prediction horizon
+N = 256 # mpc prediction horizon
 TS = 0.01
 TF = N*TS
 
@@ -39,21 +39,21 @@ IDX_THETA1_INI = 0
 IDX_THETA2_INI = 1
 
 X_GUESS = [-np.pi, np.pi]
-U_GUESS = [-20, 20]
+U_GUESS = [-40, 40]
 
 ##### cost function weights #####
 "Q = np.diag([0.1, 10, 10, 0.1]), R = 0.1, P = np.diag([1, 1, 1, 1])"
 Q = np.diag([0.1, 0.1, 10, 10]) # np.diag([0.01, 0.01, 1, 1, 10, 10])   np.diag([1, 1, 10, 10])
-Q_E = np.diag([1, 1, 1000, 1000])  # np.diag([0.01, 0.01, 10, 10, 1000, 1000])   np.diag([10, 10, 1000, 1000])
+Q_E = np.diag([1, 1, 100, 100])  # np.diag([0.01, 0.01, 10, 10, 1000, 1000])   np.diag([10, 10, 1000, 1000])
 R = 0.1
 # Q, R --> W for Acado ocp
 
 # intermediate weights
-W = scipy.linalg.block_diag(Q, R) # 6 states + 1 control input
+W = scipy.linalg.block_diag(Q, R) 
 # terminal weights
 W_TERMINAL = Q_E # 6 states
 # initial weights
-W_INI = scipy.linalg.block_diag(Q, R) # 6 states + 1 control input
+W_INI = scipy.linalg.block_diag(Q, R) 
 
 # reference state
 X_REF = np.array([0, 0, 0, 0, 0]) # 6 states + 1 u, (7,) X_REF = np.array([np.pi, 0, 0, 0, 0, 0, 0])   np.array([0, 0, 0, 0, 0])
@@ -61,11 +61,11 @@ X_REF_TERMINAL = np.array([0, 0, 0, 0]) # 6 states X_REF = np.array([np.pi, 0, 0
 # X_REF_INI= np.array([np.pi, 0, 0, 0, 0, 0, 0, 0]) # 6 states + 1 u
 
 # initial data range
-NUM_INITIAL_THETA1 = 2
-Theta1_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4, NUM_INITIAL_THETA1) 
+NUM_INITIAL_THETA1 = 3
+Theta1_INITIAL_RANGE = np.linspace(-np.pi/2,np.pi/2, NUM_INITIAL_THETA1) 
 
-NUM_INITIAL_THETA2 = 2
-Theta2_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4, NUM_INITIAL_THETA2) 
+NUM_INITIAL_THETA2 = 3
+Theta2_INITIAL_RANGE = np.linspace(-np.pi/2,np.pi/2, NUM_INITIAL_THETA2) 
 
 # rng_theta1 = np.concatenate([Theta1_INITIAL_RANGE_1, Theta1_INITIAL_RANGE_2])
 # rng_theta2 = np.concatenate([Theta2_INITIAL_RANGE_1, Theta2_INITIAL_RANGE_2])
@@ -87,7 +87,7 @@ initial_guess_u = U_GUESS
 PI_UNDER_2 = 2/np.pi
 
 def Theta1ToThetaStar1(theta1):
-    return (theta1)**2/-np.pi + np.pi
+    return np.pi - ((theta1)**2/np.pi)
 
 def Theta2ToThetaStar2(theta2):
     return (theta2-np.pi)**2/-np.pi + np.pi
@@ -326,10 +326,10 @@ def Acado_ocp_solver(x0):
    ny_e = nx
 
    # cost function
-   ocp.cost.cost_type = 'LINEAR_LS'
-   ocp.cost.cost_type_e = 'LINEAR_LS'
+   ocp.cost.cost_type = 'NONLINEAR_LS'
+   ocp.cost.cost_type_e = 'NONLINEAR_LS'
 
-   dyn_func = ca.Function('f', [model.x, model.u], [model.f_expl_expr])
+   # dyn_func = ca.Function('f', [model.x, model.u], [model.f_expl_expr])
    # for test_theta1 in np.linspace(-np.pi, np.pi, 10):
     # test_x = np.array([test_theta1, 0, 0, 0, 0, 0])
     # test_u = 5
@@ -351,20 +351,20 @@ def Acado_ocp_solver(x0):
    # Vx[:nx, :nx] = np.eye(nx)
    # ocp.cost.Vx = Vx
 
-   Vx = np.zeros((ny-2, nx)) # 5*6
-   Vx[0, 2] = 1.0
-   Vx[1, 3] = 1.0
-   Vx[2, 4] = 1.0
-   Vx[3, 5] = 1.0
-   ocp.cost.Vx = Vx
+   # Vx = np.zeros((ny-2, nx)) # 5*6
+   # Vx[0, 2] = 1.0
+   # Vx[1, 3] = 1.0
+   # Vx[2, 4] = 1.0
+   # Vx[3, 5] = 1.0
+   # ocp.cost.Vx = Vx
 
    # Vu = np.zeros((ny, nu)) # 7*1
    # Vu[-1, 0] = 1.0
    # ocp.cost.Vu = Vu
 
-   Vu = np.zeros((ny-2, nu)) # 7*1
-   Vu[-1, 0] = 1.0
-   ocp.cost.Vu = Vu
+   # Vu = np.zeros((ny-2, nu)) # 7*1
+   # Vu[-1, 0] = 1.0
+   # ocp.cost.Vu = Vu
 
    # y_e = Vxe*x_e
    
@@ -372,12 +372,12 @@ def Acado_ocp_solver(x0):
    # Vx_e[:nx, :nx] = np.eye(nx)
    # ocp.cost.Vx_e = Vx_e
 
-   Vx_e = np.zeros((ny_e-2, nx)) #6*6
-   Vx_e[0, 2] = 1.0
-   Vx_e[1, 3] = 1.0
-   Vx_e[2, 4] = 1.0
-   Vx_e[3, 5] = 1.0
-   ocp.cost.Vx_e = Vx_e
+   # Vx_e = np.zeros((ny_e-2, nx)) #6*6
+   # Vx_e[0, 2] = 1.0
+   # Vx_e[1, 3] = 1.0
+   # Vx_e[2, 4] = 1.0
+   # Vx_e[3, 5] = 1.0
+   # ocp.cost.Vx_e = Vx_e
 
    # reference state
    ocp.cost.yref = X_REF
@@ -400,7 +400,7 @@ def Acado_ocp_solver(x0):
    ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
    ocp.solver_options.hessian_approx = 'GAUSS_NEWTON'
    ocp.solver_options.integrator_type = 'IRK'
-   # ocp.solver_options.nlp_solver_type = 'SQP'
+   ocp.solver_options.nlp_solver_type = 'SQP_RTI'
    # ocp.solver_options.nlp_solver_max_iter = 10
    ocp.solver_options.sim_method_newton_iter = 10
 
@@ -432,6 +432,7 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         X_result = np.zeros((CONTROL_STEPS+1, nx))
         U_result = np.zeros((CONTROL_STEPS, nu))
         X_result[0, :] = x0_state
+        print(f'x0 -- {x0_state}')
 
         # initial guess
         print(f'u guess -- {u_ini_guess}')
@@ -508,7 +509,7 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
 
         plt.suptitle('Acrobot States and Control Input Over Time')
         plt.legend()
-        figure_name = 'idx-' + str(idx_group_of_control_step) + '_test' + '.pdf'
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_x0_' + str(x0_state[0]) + '_' + str(x0_state[1]) + '.pdf'
         figure_path = os.path.join(FOLDER_PATH, figure_name)
         plt.savefig(figure_path)
         # plt.tight_layout(rect=[0, 0.03, 1, 0.97])
@@ -659,7 +660,7 @@ def main():
             theta1_star_0 = Theta1ToThetaStar1(theta_1)
             theta2_star_0 = Theta2ToThetaStar2(theta_2)
 
-            x0 = np.array([theta_1, theta_2, 0, 0, theta1_star_0, theta2_star_0])
+            x0 = np.array([theta_1, theta_2, 0, 0, theta1_star_0, theta2_star_0]) # np.array([theta_1, theta_2, 0, 0, theta1_star_0, theta2_star_0])
             
             argument_each_group.append((x_ini_guess, u_ini_guess, idx_group_of_control_step, x0, 
                                         u_ini_memory, x_ini_memory, j_ini_memory))
