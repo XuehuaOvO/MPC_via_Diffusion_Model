@@ -64,7 +64,7 @@ If AttributeError: module 'numpy' has no attribute 'float'
 pip install numpy==1.23.5
 ```
 
-## linear mpc data collecting
+<!-- ## linear mpc data collecting
 1. Collecting noisy data (only the initial range of position and theta can be set, initial x_dot and theta_dot are always 0. Some parameters and paths in noisy_data_collecting.py should be set manually): 
 ```bash
 conda activate mpd
@@ -179,13 +179,13 @@ To train the model:
 ```bash
 cd scripts/train_diffusion
 python launch_train_01.py
-```
+``` -->
 
 
 
 
 
----
+<!-- ---
 ## Citation
 
 If you use our work or code base(s), please cite our article:
@@ -203,5 +203,5 @@ If you use our work or code base(s), please cite our article:
 ## Credits
 
 Parts of this work and software were taken and/or inspired from:
-- [https://github.com/jannerm/diffuser](https://github.com/jannerm/diffuser)
+- [https://github.com/jannerm/diffuser](https://github.com/jannerm/diffuser) -->
 
