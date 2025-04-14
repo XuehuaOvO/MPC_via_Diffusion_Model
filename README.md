@@ -20,28 +20,28 @@ Pre-requisites:
 Clone this repository with
 ```bash
 cd ~
-git clone https://github.com/XuehuaOvO/cart_pole_diffusion_based_on_MPD.git
-cd cart_pole_diffusion_based_on_MPD
+git clone https://github.com/XuehuaOvO/MPC_via_Diffusion_Model.git
+cd MPC_via_Diffusion_Model
 git submodule update --init --recursive # Initialize and update the submodules
 ```
 
 Download [IsaacGym Preview 4](https://developer.nvidia.com/isaac-gym) via wget for remote container and extract it under `deps/isaacgym`
 ```bash
 wget https://developer.nvidia.com/isaac-gym-preview-4 
-mv ~/isaac-gym-preview-4 /root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/deps/isaac-gym-preview-4
-cd ~/cart_pole_diffusion_based_on_MPD/deps
+mv ~/isaac-gym-preview-4 ~/MPC_via_Diffusion_Model/deps/isaac-gym-preview-4
+cd ~/MPC_via_Diffusion_Model/deps
 tar -xvf isaac-gym-preview-4
 ```
 
 Run the bash setup script to install everything.
 ```bash
-cd ~/cart_pole_diffusion_based_on_MPD
+cd ~/MPC_via_Diffusion_Model
 bash setup.sh
 ```
 
 Extra pkg for cart pole diffusion:
 ```bash
-cd ~/cart_pole_diffusion_based_on_MPD
+cd ~/MPC_via_Diffusion_Model
 bash setup.sh
 conda install -c conda-forge control slycot 
 conda install conda-forge::casadi
