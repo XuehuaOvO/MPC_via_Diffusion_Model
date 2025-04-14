@@ -25,7 +25,7 @@ cd MPC_via_Diffusion_Model
 git submodule update --init --recursive # Initialize and update the submodules
 ```
 
-Download [IsaacGym Preview 4](https://developer.nvidia.com/isaac-gym) via wget for remote container and extract it under `deps/isaacgym`
+Download [IsaacGym Preview 4](https://developer.nvidia.com/isaac-gym) via wget for remote container and extract it:
 ```bash
 wget https://developer.nvidia.com/isaac-gym-preview-4 
 mv ~/isaac-gym-preview-4 ~/MPC_via_Diffusion_Model/deps/isaac-gym-preview-4
@@ -39,7 +39,7 @@ cd ~/MPC_via_Diffusion_Model
 bash setup.sh
 ```
 
-Extra pkg for cart pole diffusion:
+Installing:
 ```bash
 cd ~/MPC_via_Diffusion_Model
 bash setup.sh
