@@ -11,7 +11,7 @@ import scipy.linalg
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver, AcadosSimSolver
 
 MAX_CORE_CPU = 1  # 16
-FOLDER_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/mpc_data_collecting/Acrobots/figure/new'
+FOLDER_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/mpc_data_collecting/Acrobots/figure'
 
 ##### Acrobot Parameters (Gym) #####
 LINK_LENGTH_1 = 1.0  # [m]
@@ -26,10 +26,11 @@ U_BOUND = 10
 
 
 ##### MPC parameters #####
-CONTROL_STEPS = 300
+CONTROL_STEPS = 400
+NUM_NOISY_DATA = 15
 
 # (for 1 time solving)
-N = 128 # mpc prediction horizon
+N = 256 # mpc prediction horizon
 TS = 0.01
 TF = N*TS
 
@@ -39,15 +40,15 @@ IDX_THETA1_INI = 0
 IDX_THETA2_INI = 1
 
 X_GUESS = [-np.pi, np.pi] # [-np.pi, np.pi]
-THETHA_1_GUESS_RANGE = np.linspace(np.pi, np.pi, 2)
-THETHA_2_GUESS_RANGE = np.linspace(-2*np.pi, 2*np.pi, 2)
+THETHA_1_GUESS_RANGE = np.linspace(-4*np.pi, 0, 5)
+THETHA_2_GUESS_RANGE = np.linspace(-4*np.pi, 0, 5)
 U_GUESS = [-10,10]
 
 ##### cost function weights #####
 "Q = np.diag([0.1, 10, 10, 0.1]), R = 0.1, P = np.diag([1, 1, 1, 1])"
 Q = np.diag([100, 100, 1, 1]) # np.diag([0.01, 0.01, 1, 1, 10, 10])   np.diag([1, 1, 10, 10])
 Q_E = np.diag([1000, 1000, 10, 10])  # np.diag([0.01, 0.01, 10, 10, 1000, 1000])   np.diag([10, 10, 1000, 1000])
-R = 0.1
+R = 1
 # Q, R --> W for Acado ocp
 
 # intermediate weights
@@ -64,17 +65,14 @@ X_REF_TERMINAL = np.array([0, 0, 0, 0])  # 4s
 
 # initial data range
 NUM_INITIAL_THETA1 = 1
-Theta1_INITIAL_RANGE = np.linspace(0,0, NUM_INITIAL_THETA1)  # np.linspace(-np.pi/2,np.pi/2, NUM_INITIAL_THETA1) 
+THETA1_INITIAL_RANGE = np.linspace(0,0, NUM_INITIAL_THETA1)  # np.linspace(-np.pi/2,np.pi/2, NUM_INITIAL_THETA1) 
 
 NUM_INITIAL_THETA2 = 3
-Theta2_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4, NUM_INITIAL_THETA2)  # np.linspace(-np.pi/2,np.pi/2, NUM_INITIAL_THETA2) 
-
-# rng_theta1 = np.concatenate([Theta1_INITIAL_RANGE_1, Theta1_INITIAL_RANGE_2])
-# rng_theta2 = np.concatenate([Theta2_INITIAL_RANGE_1, Theta2_INITIAL_RANGE_2])
+THETA2_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4, NUM_INITIAL_THETA2)  # np.linspace(-np.pi/2,np.pi/2, NUM_INITIAL_THETA2) 
 
 rng0 = []
-for idx1 in Theta1_INITIAL_RANGE:
-    for idx2 in Theta2_INITIAL_RANGE:
+for idx1 in THETA1_INITIAL_RANGE:
+    for idx2 in THETA2_INITIAL_RANGE:
         rng0.append([idx1,idx2])
 rng0 = np.array(rng0)
 num_datagroup = len(rng0)
@@ -489,12 +487,29 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
             # integrator.solve()
             # x_next = integrator.get("x")
             x_next = ocp_solver.get(1, "x")
+            
+            # Shift previous solution as initial guess for warm start
+            for j in range(N - 1):
+                x_guess_j = ocp_solver.get(j + 1, "x")
+                u_guess_j = ocp_solver.get(j + 1, "u")
+
+                ocp_solver.set(j, "x", x_guess_j)
+                ocp_solver.set(j, "u", u_guess_j)
+
+            x_guess_last = ocp_solver.get(N, "x")
+            ocp_solver.set(N, "x", x_guess_last)
+
+
             ocp_solver.set(0, "lbx", x_next)
             ocp_solver.set(0, "ubx", x_next)
        
             X_result[i+1,:] = x_next
-            if i+1 <= N:
-               ocp_solver.set(i+1, "x", x_guess)
+            # x_guess_next = ocp_solver.get(i+1, "x")
+            # print(f'x_guess_next --{x_guess_next}')
+
+            # if i+1 <= N:
+            # ocp_solver.set(0, "x", x_next)
+            # ocp_solver.set(0, "u", u_solve) 
         
         print(f'X_last_result -- {X_result[-1,:]}')
         print(f'U_last_result -- {U_result[-1,:]}')
@@ -537,7 +552,7 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         ini_theta2 = f'{x0_state[1]:.2f}'
         guess_1 = f'{x_ini_guess[0]:.2f}'
         guess_2 = f'{x_ini_guess[1]:.2f}'
-        figure_name = 'idx-' + str(idx_group_of_control_step) + '_x0_' + ini_theta1 + '_' + ini_theta2 + '_x-guess_' + guess_1 + '_' + guess_2 + '.pdf'
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_x0_' + ini_theta1 + '_' + ini_theta2 + '_x-guess_' + guess_1 + '_' + guess_2 + '_test_new' + '.pdf'
         figure_path = os.path.join(FOLDER_PATH, figure_name)
         plt.savefig(figure_path)
         # plt.tight_layout(rect=[0, 0.03, 1, 0.97])
@@ -667,11 +682,11 @@ def main():
 
     # memories for data
     u_ini_memory = np.zeros((1*CONTROL_STEPS, N, NUM_U)) # 80 64 1 
-    # u_random_memory = np.zeros((NUM_NOISY_DATA*CONTROL_STEPS, HOR, 1))
+    u_random_memory = np.zeros((NUM_NOISY_DATA*CONTROL_STEPS, N, 1))
     x_ini_memory = np.zeros((1*CONTROL_STEPS, NUM_X)) 
-    # x_random_memory = np.zeros((NUM_NOISY_DATA*CONTROL_STEPS, 5)) 
+    x_random_memory = np.zeros((NUM_NOISY_DATA*CONTROL_STEPS, 5)) 
     j_ini_memory = np.zeros((1*CONTROL_STEPS, 1)) 
-    # j_random_memory = np.zeros((NUM_NOISY_DATA*CONTROL_STEPS, 1)) 
+    j_random_memory = np.zeros((NUM_NOISY_DATA*CONTROL_STEPS, 1)) 
 
     # initial data groups 50
     argument_each_group = []
