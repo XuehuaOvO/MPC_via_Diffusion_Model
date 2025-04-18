@@ -13,8 +13,8 @@ import scipy.linalg
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver, AcadosSimSolver
 
 
-MAX_CORE_CPU = 1  # 16
-NUM_SEED = 14
+MAX_CORE_CPU = 25  # 16
+NUM_SEED = 1
 
 NUM_INI_THETA1 = 5
 NUM_INI_THETA2 = 10
@@ -35,7 +35,7 @@ U_BOUND = 10
 
 
 ##### MPC parameters #####
-CONTROL_STEPS = 10 # 400
+CONTROL_STEPS = 400 # 400
 NUM_NOISY_DATA = 15
 
 # (for 1 time solving)
@@ -86,7 +86,7 @@ for idx1 in THETA1_INITIAL_RANGE:
         rng0.append([idx1,idx2])
 rng0 = np.array(rng0)
 num_datagroup = len(rng0)
-print(f'rng0 -- {rng0.shape}')
+# print(f'rng0 -- {rng0.shape}')
 
 # initial guess
 guess_rng0 = []
@@ -95,7 +95,7 @@ for g_idx1 in THETHA_1_GUESS_RANGE:
         guess_rng0.append([g_idx1,g_idx2])
 guess_rng0= np.array(guess_rng0)
 num_guessgroup = len(guess_rng0)
-print(f'guess_rng0 -- {guess_rng0.shape}')
+# print(f'guess_rng0 -- {guess_rng0.shape}')
 
 INITIAL_GUESS_NUM = 2
 initial_guess_x = guess_rng0
@@ -322,8 +322,14 @@ def Acrobot_gym_model():
    return model
 
 ########## create Acado ocp (optimal control problem) solver ##########
-def Acado_ocp_solver(x0):
+def Acado_ocp_solver(x0, idx_group_of_control_step):
    ocp = AcadosOcp()
+   
+   base_path = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/mpc_data_collecting/Acrobots'
+   folder_name = f"c_generated_code_{idx_group_of_control_step}"
+   full_path = os.path.join(base_path, folder_name)
+   os.makedirs(full_path, exist_ok=True)
+   ocp.code_export_directory = full_path
    
    # ocp solver
    ocp.solver_options.N_horizon = N
@@ -424,7 +430,8 @@ def Acado_ocp_solver(x0):
    ocp.solver_options.sim_method_newton_iter = 10
 
    # build solver
-   acados_solver = AcadosOcpSolver(ocp, json_file="acados_ocp_acrobots.json", verbose=False)
+   solver_json_name = f"acados_ocp_solver_{idx_group_of_control_step}.json"
+   acados_solver = AcadosOcpSolver(ocp, json_file=solver_json_name, verbose=False)
 
    # acados_integrator = AcadosSimSolver(ocp, json_file = "acados_ocp_acrobots.json")
 
@@ -441,7 +448,7 @@ def ini_data_generating():
         for idx2 in THETA2_INITIAL_RANGE:
             ini_state.append([idx1, idx2, 0, 0]) # 50*4
     ini_state = np.array(ini_state)
-    print(f'rng0 -- {ini_state.shape}')
+    # print(f'rng0 -- {ini_state.shape}')
 
 
     # random initial theta guess
@@ -463,11 +470,11 @@ def ini_data_generating():
 
 
 def states_noise_generating(current_states,current_x_guess,current_u_guess):
-    np.random.seed(NUM_SEED)
+    # np.random.seed(NUM_SEED)
 
     # add Gaussian noise to the random initial states
     mean_noise = 0
-    std_dev_noise = 0.15
+    std_dev_noise = 0.05
 
     states_noise_array = np.zeros((NUM_NOISY_DATA, NUM_X)) # 15*4
     for i in range(NUM_NOISY_DATA):
@@ -496,7 +503,7 @@ def states_noise_generating(current_states,current_x_guess,current_u_guess):
 def original_initial_state_loop(random_ini_theta_guess:float, x0_state:np.array, idx_group_of_control_step:int,
                                       u_ini_memory, x_ini_memory, j_ini_memory):
     ########## create Acados solver ##########
-    ocp, ocp_solver = Acado_ocp_solver(x0_state)
+    ocp, ocp_solver = Acado_ocp_solver(x0_state, idx_group_of_control_step)
 
     nx = ocp.model.x.size()[0]  # number of states (4)
     nu = ocp.model.u.size()[0]  # number of states (1)
@@ -505,8 +512,8 @@ def original_initial_state_loop(random_ini_theta_guess:float, x0_state:np.array,
     X_result = np.zeros((CONTROL_STEPS+1, nx))
     U_result = np.zeros((CONTROL_STEPS, nu))
     X_result[0, :] = x0_state
-    print(f'x0 -- {x0_state}')
-    print(f'idx_group_of_control_step -- {idx_group_of_control_step}')
+    # print(f'x0 -- {x0_state}')
+    print(f'origin: idx_group_of_control_step -- {idx_group_of_control_step}')
 
     # cost
     cost = np.zeros((CONTROL_STEPS, 1))
@@ -516,7 +523,7 @@ def original_initial_state_loop(random_ini_theta_guess:float, x0_state:np.array,
     U_horizon = np.zeros((CONTROL_STEPS, N-1, nu))
 
     # initial guess
-    print(f'random_ini_theta_guess -- {random_ini_theta_guess}')
+    # print(f'random_ini_theta_guess -- {random_ini_theta_guess}')
     x_guess = random_ini_theta_guess
     u_guess = 0
 
@@ -572,12 +579,12 @@ def original_initial_state_loop(random_ini_theta_guess:float, x0_state:np.array,
         X_result[i+1,:] = x_next
 
     
-    print(f'X_last_result -- {X_result[-1,:]}')
-    print(f'U_last_result -- {U_result[-1,:]}')
-    print(f'cost_last_result -- {cost[-1,:]}')
+    # print(f'X_last_result -- {X_result[-1,:]}')
+    # print(f'U_last_result -- {U_result[-1,:]}')
+    # print(f'cost_last_result -- {cost[-1,:]}')
 
     x_ini_memory = X_result[0:-1, :]
-    print(f'x_ini_memory last --{x_ini_memory[-1,:]}')
+    # print(f'x_ini_memory last --{x_ini_memory[-1,:]}')
     j_ini_memory = cost
 
     return x_ini_memory, u_ini_memory, j_ini_memory, X_horizon, U_horizon
@@ -585,7 +592,7 @@ def original_initial_state_loop(random_ini_theta_guess:float, x0_state:np.array,
 ########## original single state control loop ########## 
 def noise_state_single_loop(noisy_data, noisy_data_x_guess, noisy_data_u_guess, idx_noise_data, ctl_step, idx_group_of_control_step):
     ########## create Acados solver ##########
-    ocp, ocp_solver = Acado_ocp_solver(noisy_data)
+    ocp, ocp_solver = Acado_ocp_solver(noisy_data, idx_group_of_control_step)
 
     nx = ocp.model.x.size()[0]  # number of states (4)
     nu = ocp.model.u.size()[0]  # number of states (1)
@@ -593,8 +600,8 @@ def noise_state_single_loop(noisy_data, noisy_data_x_guess, noisy_data_u_guess, 
     # noise u memory
     # X_step_result = np.zeros((1, nx))
     U_step_result = np.zeros((1, N, nu))
-    print(f'noisy_data -- {noisy_data}')
-    print(f'idx_noise_data -- {idx_noise_data}')
+    # print(f'noisy_data -- {noisy_data}')
+    # print(f'idx_noise_data -- {idx_noise_data}')
 
     # cost
     cost_step_result = np.zeros((1, 1))
@@ -651,15 +658,15 @@ def RunMPCForSingle_IniState_IniGuess(random_ini_theta_guess:float, x0_state:np.
         ############################################## original initial state control loop ############################################### 
         x_ini_memory, u_ini_memory, j_ini_memory, X_horizon, U_horizon = original_initial_state_loop(random_ini_theta_guess, x0_state, idx_group_of_control_step, u_ini_memory, x_ini_memory, j_ini_memory)
         print(f'index {idx_group_of_control_step} initial data control loop finished!!!!!!')
-        print(f'x_data size -- {x_ini_memory.shape}')
-        print(f'u_data size -- {u_ini_memory.shape}')
+        # print(f'x_data size -- {x_ini_memory.shape}')
+        # print(f'u_data size -- {u_ini_memory.shape}')
         print(f'----------------------------------------------------')
         print(f'----------------------------------------------------')
 
         ############################################## noise data generating ##############################################
         current_states = np.zeros(4)
         for ctl_step in range(CONTROL_STEPS):
-                print(f'[initial_idx, ctl_step] -- {idx_group_of_control_step},{ctl_step}')
+                print(f'[initial_idx, ctl_step] -- {idx_group_of_control_step}, {ctl_step}')
                 for i in range(NUM_X):
                     current_states[i] = x_ini_memory[ctl_step,i]
 
@@ -669,8 +676,8 @@ def RunMPCForSingle_IniState_IniGuess(random_ini_theta_guess:float, x0_state:np.
                     noisy_data, noisy_data_x_guess, noisy_data_u_guess = states_noise_generating(current_states,current_x_guess,current_u_guess)
                 else:
 
-                    current_x_guess = X_horizon[ctl_step,:,:]
-                    current_u_guess = U_horizon[ctl_step,:,:]
+                    current_x_guess = X_horizon[ctl_step-1,:,:]
+                    current_u_guess = U_horizon[ctl_step-1,:,:]
                     noisy_data, noisy_data_x_guess, noisy_data_u_guess = states_noise_generating(current_states,current_x_guess,current_u_guess)
 
         
@@ -693,10 +700,10 @@ def RunMPCForSingle_IniState_IniGuess(random_ini_theta_guess:float, x0_state:np.
                     # noi_abs_distance.append(random_abs_distance)
                     
                     # save noisy data
-                    print(f'location -- {n * CONTROL_STEPS + ctl_step}')
-                    u_random_memory[n * CONTROL_STEPS + ctl_step, :, :] = U_step_result
-                    x_random_memory[n * CONTROL_STEPS + ctl_step, :] = noisy_state_n
-                    j_random_memory[n * CONTROL_STEPS + ctl_step, 0] = cost_step_result
+                    # print(f'location -- {n * CONTROL_STEPS + ctl_step}')
+                    u_random_memory[ctl_step * NUM_NOISY_DATA + n, :, :] = U_step_result
+                    x_random_memory[ctl_step * NUM_NOISY_DATA + n, :] = noisy_state_n
+                    j_random_memory[ctl_step * NUM_NOISY_DATA + n, 0] = cost_step_result
 
                     # print(f'n --{n}')
 
@@ -717,8 +724,8 @@ def RunMPCForSingle_IniState_IniGuess(random_ini_theta_guess:float, x0_state:np.
                 for i in range(NUM_X):
                     noisy_state_each_ctl_step = x_random_memory[z*NUM_NOISY_DATA:z*NUM_NOISY_DATA+NUM_NOISY_DATA,i]
                     for k in range(0,NUM_NOISY_DATA):
-                            plt.scatter(t[z], noisy_state_each_ctl_step[k], s = 20, color = 'lightgrey')
-        plt.scatter(t[CONTROL_STEPS-1], noisy_state_each_ctl_step[0], s = 20, color = 'lightgrey', label=f"noise")
+                            plt.scatter(t[z], noisy_state_each_ctl_step[k], s = 10, color = 'lightgrey')
+        plt.scatter(t[CONTROL_STEPS-1], noisy_state_each_ctl_step[0], s = 10, color = 'lightgrey', label=f"noise")
                 
         plt.xlabel("Time [s]")
         plt.ylabel("state")
@@ -733,8 +740,8 @@ def RunMPCForSingle_IniState_IniGuess(random_ini_theta_guess:float, x0_state:np.
         for z in range(CONTROL_STEPS):
                 noisy_u_each_ctl_step = u_random_memory[z*NUM_NOISY_DATA:z*NUM_NOISY_DATA+NUM_NOISY_DATA,0,0]
                 for k in range(0, NUM_NOISY_DATA):
-                    plt.scatter(t[z], noisy_u_each_ctl_step[k], s = 20, color = 'lightgrey')
-        plt.scatter(t[CONTROL_STEPS-1], noisy_u_each_ctl_step[0], s = 20, color = 'lightgrey', label=f"noise")
+                    plt.scatter(t[z], noisy_u_each_ctl_step[k], s = 10, color = 'lightgrey')
+        plt.scatter(t[CONTROL_STEPS-1], noisy_u_each_ctl_step[0], s = 10, color = 'lightgrey', label=f"noise")
                 
         plt.xlabel("Time [s]")
         plt.ylabel("control input")
@@ -749,8 +756,8 @@ def RunMPCForSingle_IniState_IniGuess(random_ini_theta_guess:float, x0_state:np.
         for z in range(CONTROL_STEPS):
                 noisy_j_each_ctl_step = j_random_memory[z*NUM_NOISY_DATA:z*NUM_NOISY_DATA+NUM_NOISY_DATA,0]
                 for k in range(0, NUM_NOISY_DATA):
-                    plt.scatter(t[z], noisy_j_each_ctl_step[k], s = 20, color = 'lightgrey')
-        plt.scatter(t[CONTROL_STEPS-1], noisy_j_each_ctl_step[0], s = 20, color = 'lightgrey', label=f"noise")
+                    plt.scatter(t[z], noisy_j_each_ctl_step[k], s = 10, color = 'lightgrey')
+        plt.scatter(t[CONTROL_STEPS-1], noisy_j_each_ctl_step[0], s = 10, color = 'lightgrey', label=f"noise")
                 
         plt.xlabel("Time [s]")
         plt.ylabel("cost")
@@ -840,9 +847,9 @@ def RunMPCForSingle_IniState_IniGuess(random_ini_theta_guess:float, x0_state:np.
         x_data = torch.cat((torch_x_ini_memory_tensor, torch_x_random_memory_tensor), dim=0)
         j_data = torch.cat((torch_j_ini_memory_tensor, torch_j_random_memory_tensor), dim=0)
 
-        print(f'u_size -- {torch_u_ini_memory_tensor.size()}')
-        print(f'x_size -- {torch_x_ini_memory_tensor.size()}')
-        print(f'j_size -- {torch_j_ini_memory_tensor.size()}')
+        # print(f'u_size -- {torch_u_ini_memory_tensor.size()}')
+        # print(f'x_size -- {torch_x_ini_memory_tensor.size()}')
+        # print(f'j_size -- {torch_j_ini_memory_tensor.size()}')
 
         # save data in PT file for training
         torch.save(u_data, os.path.join(FOLDER_PATH , f'u_data_' + 'idx-' + str(idx_group_of_control_step) + '_test.pt'))
