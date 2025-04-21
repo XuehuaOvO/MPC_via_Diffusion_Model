@@ -13,7 +13,7 @@ import scipy.linalg
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver, AcadosSimSolver
 
 
-MAX_CORE_CPU = 25  # 25
+MAX_CORE_CPU = 1  # 25
 NUM_SEED = 1
 
 NUM_INI_THETA1 = 1
@@ -453,7 +453,7 @@ def MG_ini_data_generating():
 
 
     # random initial theta guess
-    random_theta_guess_list = np.zeros(NUM_INI_STATE, MULTI_GUESS, NUM_X)
+    random_theta_guess_list = np.zeros([NUM_INI_STATE, MULTI_GUESS, NUM_X])
     for idx in range(NUM_INI_STATE):
          for i in range(MULTI_GUESS):
                theta1_guess = np.round(random.uniform(-4*np.pi, 0),5)
@@ -503,22 +503,22 @@ def states_noise_generating(current_states):
 def next_MG_guesses_generating(x_horizon, u_horizon):
     np.random.seed(NUM_SEED)
 
-    x_MG = np.zeros(MULTI_GUESS,N, NUM_X)
+    x_MG = np.zeros((MULTI_GUESS,N, NUM_X))
     x_MG[0,:,:] = x_horizon
     for num in range(MULTI_GUESS-1):
         for i in range(x_horizon.shape[0]):
-             x_guess_0 = np.round(random.uniform(x_horizon[i,0]-1, x_horizon[i,0]+1),2)
-             x_guess_1 = np.round(random.uniform(x_horizon[i,1]-1, x_horizon[i,1]+1),2)
-             x_guess_2 = np.round(random.uniform(x_horizon[i,2]-1, x_horizon[i,2]+1),2)
-             x_guess_3 = np.round(random.uniform(x_horizon[i,3]-1, x_horizon[i,3]+1),2)
+             x_guess_0 = np.round(random.uniform(x_horizon[i,0]-0.5, x_horizon[i,0]+0.5),2)
+             x_guess_1 = np.round(random.uniform(x_horizon[i,1]-0.5, x_horizon[i,1]+0.5),2)
+             x_guess_2 = np.round(random.uniform(x_horizon[i,2]-0.5, x_horizon[i,2]+0.5),2)
+             x_guess_3 = np.round(random.uniform(x_horizon[i,3]-0.5, x_horizon[i,3]+0.5),2)
              x_guess = np.array([x_guess_0, x_guess_1, x_guess_2, x_guess_3])
              x_MG[num+1,i,:] = x_guess
 
-    u_MG = np.zeros(MULTI_GUESS,N-1, NUM_U)
+    u_MG = np.zeros((MULTI_GUESS,N-1, NUM_U))
     u_MG[0,:,:] = u_horizon
     for num in range(MULTI_GUESS-1):
-        for i in range(x_horizon.shape[0]):
-             u_guess = np.round(random.uniform(u_horizon[i,:]-2, x_horizon[i,:]+2),2)
+        for i in range(u_horizon.shape[0]):
+             u_guess = np.round(random.uniform(u_horizon[i,:]-2, u_horizon[i,:]+2),2)
              u_MG[num+1,i,:] = u_guess
    
     return x_MG, u_MG
@@ -644,6 +644,7 @@ def original_MG_initial_state_loop(random_ini_theta_guesses:float, x0_state:np.a
          ocp_solver.set(0, "ubx", x_next)
 
          X_result[i+1,:] = x_next
+         print(f'control step -- {i} finished!')
 
     
     # print(f'X_last_result -- {X_result[-1,:]}')
