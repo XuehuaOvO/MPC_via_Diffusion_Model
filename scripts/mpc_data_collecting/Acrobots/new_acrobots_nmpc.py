@@ -13,14 +13,14 @@ import scipy.linalg
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver, AcadosSimSolver
 
 
-MAX_CORE_CPU = 25  # 16
+MAX_CORE_CPU = 25  # 25
 NUM_SEED = 1
 
 NUM_INI_THETA1 = 5
 NUM_INI_THETA2 = 10
 NUM_INI_STATE = NUM_INI_THETA1*NUM_INI_THETA2
 
-FOLDER_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/mpc_data_collecting/Acrobots/figure/collecting'
+FOLDER_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/mpc_data_collecting/Acrobots/figure/collecting_1'
 
 ##### Acrobot Parameters (Gym) #####
 LINK_LENGTH_1 = 1.0  # [m]
@@ -325,7 +325,7 @@ def Acrobot_gym_model():
 def Acado_ocp_solver(x0, idx_group_of_control_step):
    ocp = AcadosOcp()
    
-   base_path = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/mpc_data_collecting/Acrobots'
+   base_path = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/mpc_data_collecting/Acrobots/solver_file'
    folder_name = f"c_generated_code_{idx_group_of_control_step}"
    full_path = os.path.join(base_path, folder_name)
    os.makedirs(full_path, exist_ok=True)
@@ -413,9 +413,9 @@ def Acado_ocp_solver(x0, idx_group_of_control_step):
    ocp.constraints.x0 = x0 # initial states
 
     
-   ocp.constraints.lbx = np.array([-2*np.pi, -2*np.pi]) # , -4*np.pi, -9*np.pi # np.array([-2*np.pi, -2*np.pi])
-   ocp.constraints.ubx = np.array([2*np.pi, 2*np.pi]) # , 4*np.pi, 9*np.pi # np.array([-2*np.pi, -2*np.pi])
-   ocp.constraints.idxbx = np.array([0, 1])  # 2 constraints
+   # ocp.constraints.lbx = np.array([-2*np.pi, -2*np.pi]) # , -4*np.pi, -9*np.pi # np.array([-2*np.pi, -2*np.pi])
+   # ocp.constraints.ubx = np.array([2*np.pi, 2*np.pi]) # , 4*np.pi, 9*np.pi # np.array([-2*np.pi, -2*np.pi])
+   # ocp.constraints.idxbx = np.array([0, 1])  # 2 constraints
 
    # ocp.constraints.lbu = np.array([-U_BOUND])
    # ocp.constraints.ubu = np.array([U_BOUND])
@@ -724,8 +724,8 @@ def RunMPCForSingle_IniState_IniGuess(random_ini_theta_guess:float, x0_state:np.
                 for i in range(NUM_X):
                     noisy_state_each_ctl_step = x_random_memory[z*NUM_NOISY_DATA:z*NUM_NOISY_DATA+NUM_NOISY_DATA,i]
                     for k in range(0,NUM_NOISY_DATA):
-                            plt.scatter(t[z], noisy_state_each_ctl_step[k], s = 10, color = 'lightgrey')
-        plt.scatter(t[CONTROL_STEPS-1], noisy_state_each_ctl_step[0], s = 10, color = 'lightgrey', label=f"noise")
+                            plt.scatter(t[z], noisy_state_each_ctl_step[k], s = 20, color = 'lightgrey')
+        plt.scatter(t[CONTROL_STEPS-1], noisy_state_each_ctl_step[0], s = 20, color = 'lightgrey', label=f"noise")
                 
         plt.xlabel("Time [s]")
         plt.ylabel("state")
@@ -740,8 +740,8 @@ def RunMPCForSingle_IniState_IniGuess(random_ini_theta_guess:float, x0_state:np.
         for z in range(CONTROL_STEPS):
                 noisy_u_each_ctl_step = u_random_memory[z*NUM_NOISY_DATA:z*NUM_NOISY_DATA+NUM_NOISY_DATA,0,0]
                 for k in range(0, NUM_NOISY_DATA):
-                    plt.scatter(t[z], noisy_u_each_ctl_step[k], s = 10, color = 'lightgrey')
-        plt.scatter(t[CONTROL_STEPS-1], noisy_u_each_ctl_step[0], s = 10, color = 'lightgrey', label=f"noise")
+                    plt.scatter(t[z], noisy_u_each_ctl_step[k], s = 20, color = 'lightgrey')
+        plt.scatter(t[CONTROL_STEPS-1], noisy_u_each_ctl_step[0], s = 20, color = 'lightgrey', label=f"noise")
                 
         plt.xlabel("Time [s]")
         plt.ylabel("control input")
@@ -756,8 +756,8 @@ def RunMPCForSingle_IniState_IniGuess(random_ini_theta_guess:float, x0_state:np.
         for z in range(CONTROL_STEPS):
                 noisy_j_each_ctl_step = j_random_memory[z*NUM_NOISY_DATA:z*NUM_NOISY_DATA+NUM_NOISY_DATA,0]
                 for k in range(0, NUM_NOISY_DATA):
-                    plt.scatter(t[z], noisy_j_each_ctl_step[k], s = 10, color = 'lightgrey')
-        plt.scatter(t[CONTROL_STEPS-1], noisy_j_each_ctl_step[0], s = 10, color = 'lightgrey', label=f"noise")
+                    plt.scatter(t[z], noisy_j_each_ctl_step[k], s = 20, color = 'lightgrey')
+        plt.scatter(t[CONTROL_STEPS-1], noisy_j_each_ctl_step[0], s = 20, color = 'lightgrey', label=f"noise")
                 
         plt.xlabel("Time [s]")
         plt.ylabel("cost")
