@@ -13,7 +13,7 @@ import scipy.linalg
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver, AcadosSimSolver
 
 
-MAX_CORE_CPU = 1  # 25
+MAX_CORE_CPU = 25  # 25
 NUM_SEED = 1
 
 NUM_INI_THETA1 = 1
@@ -644,7 +644,7 @@ def original_MG_initial_state_loop(random_ini_theta_guesses:float, x0_state:np.a
          ocp_solver.set(0, "ubx", x_next)
 
          X_result[i+1,:] = x_next
-         print(f'control step -- {i} finished!')
+         print(f'idx -- {idx_group_of_control_step}, control step -- {i} finished!')
 
     
     # print(f'X_last_result -- {X_result[-1,:]}')
@@ -739,8 +739,8 @@ def noise_state_single_loop_MG(noisy_data, noisy_data_x_guess, noisy_data_u_gues
     U_step_result[0,0,0] = noise_u_solve
 
     for k in range(N - 1):
-        u_hori_k = temp_U_horizon[min_index, k+1, :]
-        U_step_result[0,k + 1,0] = u_hori_k
+        u_hori_k = temp_U_horizon[min_index, k, :]
+        U_step_result[0,k,0] = u_hori_k
 
     # save cost
     cost_solve = temp_cost[min_index,:]
@@ -835,7 +835,7 @@ def RunMPCForSingle_IniState_IniGuess(random_ini_theta_guesses:float, x0_state:n
         plt.xlabel("Time [s]")
         plt.ylabel("state")
         plt.legend()
-        figure_name = 'idx-' + str(idx_group_of_control_step) + '_x_test' + '.pdf'
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_x_MG' + '.pdf'
         figure_path = os.path.join(FOLDER_PATH, figure_name)
         plt.savefig(figure_path)
 
@@ -851,7 +851,7 @@ def RunMPCForSingle_IniState_IniGuess(random_ini_theta_guesses:float, x0_state:n
         plt.xlabel("Time [s]")
         plt.ylabel("control input")
         plt.legend()
-        figure_name = 'idx-' + str(idx_group_of_control_step) + '_u_test' + '.pdf'
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_u_MG' + '.pdf'
         figure_path = os.path.join(FOLDER_PATH, figure_name)
         plt.savefig(figure_path)
 
@@ -867,7 +867,7 @@ def RunMPCForSingle_IniState_IniGuess(random_ini_theta_guesses:float, x0_state:n
         plt.xlabel("Time [s]")
         plt.ylabel("cost")
         plt.legend()
-        figure_name = 'idx-' + str(idx_group_of_control_step) + '_j_test' + '.pdf'
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_j_MG' + '.pdf'
         figure_path = os.path.join(FOLDER_PATH, figure_name)
         plt.savefig(figure_path)
 
@@ -895,9 +895,9 @@ def RunMPCForSingle_IniState_IniGuess(random_ini_theta_guesses:float, x0_state:n
         # print(f'j_size -- {torch_j_ini_memory_tensor.size()}')
 
         # save data in PT file for training
-        torch.save(u_data, os.path.join(FOLDER_PATH , f'u_data_' + 'idx-' + str(idx_group_of_control_step) + '_test.pt'))
-        torch.save(x_data, os.path.join(FOLDER_PATH , f'x_data_' + 'idx-' + str(idx_group_of_control_step) + '_test.pt'))
-        torch.save(j_data, os.path.join(FOLDER_PATH , f'j_data_' + 'idx-' + str(idx_group_of_control_step) + '_test.pt'))
+        torch.save(u_data, os.path.join(FOLDER_PATH , f'u_data_' + 'idx-' + str(idx_group_of_control_step) + '_MG.pt'))
+        torch.save(x_data, os.path.join(FOLDER_PATH , f'x_data_' + 'idx-' + str(idx_group_of_control_step) + '_MG.pt'))
+        torch.save(j_data, os.path.join(FOLDER_PATH , f'j_data_' + 'idx-' + str(idx_group_of_control_step) + '_MG.pt'))
 
     
     except Exception as e:
