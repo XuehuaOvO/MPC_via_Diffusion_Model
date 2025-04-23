@@ -11,3 +11,4 @@ dependencies:
       - matplotlib
       - casadi
       - control
+      - mujoco
