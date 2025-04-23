@@ -23,8 +23,10 @@ allow_ops_in_compiled_graph()
 
 TRAINED_MODELS_DIR = '../../trained_models/' # main loader of all saved trained models
 MODEL_FOLDER = 'cart_pole_84000_test1'   # '180000_training_data' # choose a folder in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
-MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/cart_pole_84000_test1/final' # the absolute path of the trained model
+MODEL_PATH = 'trained_models/cart_pole_84000_test1/final' # the absolute path of the trained model
 MODEL_ID = 'final' # number of training
+
+RESULTS_SAVING_PATH = 'diffusion_model_performance/Cart_Pole'
 
 POSITION_INITIAL_RANGE = np.linspace(-5,5,5) 
 THETA_INITIAL_RANGE = np.linspace(3*np.pi/4,5*np.pi/4,5) 
@@ -50,7 +52,7 @@ INITIAL_GUESS_NUM = 2
 initial_guess_x = [10, -10]
 initial_guess_u = [1000, -1000]
 
-RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/cart_pole_test1_84000'
+RESULTS_SAVED_PATH = '~/model_performance_saving/cart_pole_test1_84000'
 
 # sampling time
 SAMPLING_TIMES = 10
@@ -329,7 +331,7 @@ def experiment(
 
     ################################################################
     model_dir = MODEL_PATH 
-    results_dir = os.path.join(model_dir, 'results_inference')
+    results_dir = RESULTS_SAVING_PATH
     
     os.makedirs(results_dir, exist_ok=True)
 
@@ -703,7 +705,7 @@ def experiment(
     plt.xlabel('Control Step')
     plt.grid()
     plt.legend() 
-    figure_name = 'Diffusion_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_diffusion_theta_0203' + '.pdf'
+    figure_name = 'Diffusion_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_diffusion_theta' + '.pdf'
     figure_path = os.path.join(results_dir, figure_name)
     plt.savefig(figure_path)
     
@@ -719,7 +721,7 @@ def experiment(
     plt.xlabel('Control Step')
     plt.grid()
     plt.legend() 
-    figure_name = 'Diffusion_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_diffusion_thetadot_0203' + '.pdf'
+    figure_name = 'Diffusion_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_diffusion_thetadot' + '.pdf'
     figure_path = os.path.join(results_dir, figure_name)
     plt.savefig(figure_path)
     
@@ -735,7 +737,7 @@ def experiment(
     plt.xlabel('Control Step')
     plt.grid()
     plt.legend() 
-    figure_name = 'Diffusion_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_diffusion_thetastar_0203' + '.pdf'
+    figure_name = 'Diffusion_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_diffusion_thetastar' + '.pdf'
     figure_path = os.path.join(results_dir, figure_name)
     plt.savefig(figure_path)
     
@@ -753,7 +755,7 @@ def experiment(
     plt.xlabel('Control Step', fontsize=14, fontweight='bold')
     plt.grid()
     plt.legend(fontsize=14, prop={'weight': 'bold'}) 
-    figure_name = 'Diffusion_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_diffusion_ctrl_0203' + '.pdf'
+    figure_name = 'Diffusion_CartPole_' + 'x0_' + str(X0_IDX) + 'steps_' + str(ITERATIONS) + '_diffusion_ctrl' + '.pdf'
     figure_path = os.path.join(results_dir, figure_name)
     plt.savefig(figure_path)
     
