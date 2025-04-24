@@ -95,7 +95,7 @@ Running the script will launch the MuJoCo viewer, where you'll see a simulation 
 The script also visualizes the resulting trajectory of the gripper base.
 
 
-📌 Reference:
+## Reference:
 This work is based in part on concepts and code from mpd-public (https://github.com/joaoamcarvalho/mpd-public) by João Carvalho and (https://github.com/tomasz-naklicki/Panda_MJ_MPC) by Tomasz Naklicki. We gratefully acknowledge their contributions to the open-source community.
 
 <!-- ## linear mpc data collecting
