@@ -193,3 +193,6 @@ deps/isaac-gym-preview-4
 /scripts/mpc_data_collecting/Acrobots/figure
 /scripts/mpc_data_collecting/Acrobots/acados_ocp_acrobots.json
 /acados_ocp_acrobots.json
+
+/scripts/Panda/panda_inference/diffusion_model_performance
+/diffusion_model_performance
