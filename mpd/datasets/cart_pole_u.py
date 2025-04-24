@@ -10,17 +10,20 @@ from mpd.datasets.normalization import DatasetNormalizer
 from mpd.utils.loading import load_params_from_yaml
 
 
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, '../../')) 
+
 # Dataset path setting
-DATASET_BASE_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data' 
+DATASET_BASE_PATH =  os.path.join(PROJECT_ROOT, 'training_data')
 
 # Data Name Setting 
 # Panda
-# U_DATA_NAME =  'panda_test6/u_data_cat_test6.pt'   # eg: 'u_ini_10x15_noise_15_step_50_hor_64.pt'   'panda_test4/u_data_cat_test4.pt' 'u_tensor_180000-8-1.pt'
-# X0_CONDITION_DATA_NAME = 'panda_test6/x_data_cat_test6.pt'
+U_DATA_NAME =  'panda_test6/u_data_cat_test6.pt'   # eg: 'u_ini_10x15_noise_15_step_50_hor_64.pt'   'panda_test4/u_data_cat_test4.pt' 'u_tensor_180000-8-1.pt'
+X0_CONDITION_DATA_NAME = 'panda_test6/x_data_cat_test6.pt'
 
 # CartPole
-U_DATA_NAME = 'u_data_cat_test1.pt' # 'panda_test6/u_data_cat_test6.pt'   # eg: 'u_ini_10x15_noise_15_step_50_hor_64.pt'   'panda_test4/u_data_cat_test4.pt' 'u_tensor_180000-8-1.pt'
-X0_CONDITION_DATA_NAME = 'x_data_cat_test1.pt' # 'panda_test6/x_data_cat_test6.pt' # eg: 'x0_ini_10x15_noise_15_step_50_hor_64_4DoF.pt'   'panda_test4/x_data_cat_test4.pt' 'x0_tensor_180000-4.pt'
+# U_DATA_NAME = 'u_data_cat_test1.pt' # 'panda_test6/u_data_cat_test6.pt'   # eg: 'u_ini_10x15_noise_15_step_50_hor_64.pt'   'panda_test4/u_data_cat_test4.pt' 'u_tensor_180000-8-1.pt'
+# X0_CONDITION_DATA_NAME = 'x_data_cat_test1.pt' # 'panda_test6/x_data_cat_test6.pt' # eg: 'x0_ini_10x15_noise_15_step_50_hor_64_4DoF.pt'   'panda_test4/x_data_cat_test4.pt' 'x0_tensor_180000-4.pt'
 
 dataset_base_dir = DATASET_BASE_PATH 
 
