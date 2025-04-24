@@ -196,3 +196,4 @@ deps/isaac-gym-preview-4
 
 /scripts/Panda/panda_inference/diffusion_model_performance
 /diffusion_model_performance
+/v_2_g.py
