@@ -238,14 +238,14 @@ def main():
     ######## fig1 xpos 3D ########
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
-    ax.plot(x_pos_memory[:,0], x_pos_memory[:,1], x_pos_memory[:,2])
+    ax.plot(x_pos_memory[:,0], x_pos_memory[:,1], x_pos_memory[:,2], label='Gripper base trajectory')
 
     # final & target point
     point = [x_pos_memory[-1,0], x_pos_memory[-1,1], x_pos_memory[-1,2]]
-    ax.scatter(point[0], point[1], point[2], color='green', s=10)
+    ax.scatter(point[0], point[1], point[2], color='green', s=10, label='Final simulation position')
     
     target = TARGET_POS
-    ax.scatter(target[0,0], target[1,0], target[2,0], color='red', s=10)
+    ax.scatter(target[0,0], target[1,0], target[2,0], color='red', s=10, label='Target position')
 
     # Set axis labels
     ax.set_xlabel('X')

@@ -10,7 +10,7 @@ The video and figure below illustrate the control process and show the resulting
 
 
 ![Franka Diffusion Demo](Franka_Panda_Diffusion.gif)
-![Franka Gripper Base Trajectory](scripts/Panda/panda_inference/gripper_base_traj.pdf)
+![Franka Gripper Base Trajectory](scripts/Panda/panda_inference/Gripper_Base_Traj.png)
 
 
 <!-- The trained diffusion models can generate multi-modal samples, allowing the system to select the best solution to address the control problem effectively. -->
