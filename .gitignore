@@ -184,7 +184,6 @@ deps/isaac-gym-preview-4
 /model_performance_saving/
 /trained_models/
 /nn_trained_models/
-/scripts/Panda/xml/
 /training_data_collecting/
 /cart pole nmpc/
 /figures/
@@ -194,3 +193,5 @@ deps/isaac-gym-preview-4
 /scripts/mpc_data_collecting/Acrobots/figure
 /scripts/mpc_data_collecting/Acrobots/acados_ocp_acrobots.json
 /acados_ocp_acrobots.json
+/scripts/mpc_data_collecting/Acrobots/solver_file
+/training_data_collecting/CartPole-LMPC
