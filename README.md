@@ -15,8 +15,6 @@ The video and figure below illustrate the control process and show the resulting
 
 <!-- The trained diffusion models can generate multi-modal samples, allowing the system to select the best solution to address the control problem effectively. -->
 
-📌 Reference:
-This work is based in part on concepts and code from mpd-public (https://github.com/joaoamcarvalho/mpd-public) by João Carvalho. We thank the authors for making their implementation publicly available.
 
 ---
 
@@ -95,6 +93,10 @@ python inference_diffusion_panda.py
 ```
 Running the script will launch the MuJoCo viewer, where you'll see a simulation of the Franka Panda gripper base being moved to a target position using the pre-trained diffusion model.
 The script also visualizes the resulting trajectory of the gripper base.
+
+
+📌 Reference:
+This work is based in part on concepts and code from mpd-public (https://github.com/joaoamcarvalho/mpd-public) by João Carvalho and (https://github.com/tomasz-naklicki/Panda_MJ_MPC) by Tomasz Naklicki. We gratefully acknowledge their contributions to the open-source community.
 
 <!-- ## linear mpc data collecting
 1. Collecting noisy data (only the initial range of position and theta can be set, initial x_dot and theta_dot are always 0. Some parameters and paths in noisy_data_collecting.py should be set manually): 
