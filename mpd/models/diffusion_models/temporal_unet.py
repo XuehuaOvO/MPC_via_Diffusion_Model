@@ -1,4 +1,5 @@
 import einops
+import os
 import numpy as np
 import torch
 import torch.nn as nn
@@ -10,6 +11,9 @@ from mpd.models.layers.layers import GaussianFourierProjection, Downsample1d, Co
     ResidualTemporalBlock, TimeEncoder, MLP, group_norm_n_groups, LinearAttention, PreNorm, Residual, TemporalBlockMLP
 from mpd.models.layers.layers_attention import SpatialTransformer
 
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, '../../../')) 
+
 
 UNET_DIM_MULTS = {
     0: (1, 2, 4),
@@ -20,9 +24,13 @@ UNET_DIM_MULTS = {
 # example '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/CartPole-LMPC/x0_tensor_180000-4.pt'
 
 # Panda
-# CONDITION_DATA = torch.load('/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/Panda-Data/panda_test6/x_data_cat_test6.pt') # /root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/Panda-Data/panda_test4/x_data_cat_test4.pt
+data_path = os.path.join(PROJECT_ROOT, 'training_data', 'Panda-Data', 'panda_test6', 'x_data_cat_test6.pt')
+CONDITION_DATA = torch.load(data_path) # /root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data/Panda-Data/panda_test4/x_data_cat_test4.pt
+
 # Cart Pole
-CONDITION_DATA = torch.load('/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/training_data_collecting/nmpc_cart_pole_training_pt/x_data_cat_test1.pt')
+# data_path = os.path.join(PROJECT_ROOT, 'training_data', 'CartPole-NMPC', 'x_data_cat_test1.pt')
+# CONDITION_DATA = torch.load(data_path)
+
 X_SIZE = CONDITION_DATA.size(dim=1)
 
 class TemporalUnet(nn.Module):
