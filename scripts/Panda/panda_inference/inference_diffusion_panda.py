@@ -17,13 +17,22 @@ import torch
 import random
 import casadi as ca
 import time
+import imageio
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, '../../../')) 
 
 # Trained Model Info
 TRAINED_MODELS_DIR = '../../trained_models/' # main loader of all saved trained models
 MODEL_FOLDER = 'panda_test6_117600'  #'180000_training_data' # choose a folder in the trained_models (eg. 420000 is the number of total training data, this folder contains all trained models based on the 420000 training data)
-MODEL_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/panda_test6_117600/final' #'/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/180000_training_data/100000' # the absolute path of the trained model
+MODEL_PATH = os.path.join(PROJECT_ROOT, 'trained_models', 'panda_test6_117600', 'final') #'/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/trained_models/180000_training_data/100000' # the absolute path of the trained model
 MODEL_ID = 'final' # number of training
 RESULTS_SAVED_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/Panda_test6_performance' # '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/model_performance_saving/Panda_113400' 
+
+RESULTS_SAVING_PATH = 'diffusion_model_performance/Franka_Panda'
+
+
+xml_path = os.path.join(PROJECT_ROOT, 'scripts', 'Panda', 'xml', 'mjx_scene.xml')
 
 # Sampling data
 # NUM_SEED = 42
@@ -75,8 +84,12 @@ def main():
     ini_joint_states = np.array([[0, 0, 0, 0, 0, 0, 0]])
 
     # panda mujoco
-    panda = mujoco.MjModel.from_xml_path('/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/Panda/xml/mjx_scene.xml')
+    panda = mujoco.MjModel.from_xml_path(xml_path)
     data = mujoco.MjData(panda)
+    # hand_body_id = panda.body('hand')
+    # for geom_id in range(panda.ngeom):
+    #      if panda.geom_bodyid[geom_id] == hand_body_id:
+    #           panda.geom_rgba[geom_id] = np.array([1.0, 0.0, 0.0, 1.0])
     # viewer = mujoco.viewer.launch(panda, data)
 
     # panda initialization
@@ -100,69 +113,88 @@ def main():
     sampling_step = 0
 
     # diffusion sampling loop
-    for panda_step in range(0, SAMPLING_STEPS*CONTROL_RATE):
-
-        if panda_step % CONTROL_RATE == 0:
-            # current panda data loading
-            q_current_pos, x_current_pos, context_current = state_loading(panda,data)
+    with mujoco.viewer.launch_passive(panda, data) as viewer:
+        # time.sleep(20) 
+        for panda_step in range(0, SAMPLING_STEPS*CONTROL_RATE):
+            if not viewer.is_running():
+                 break
             
-            # load context to cuda
-            x_current = torch.tensor(context_current).to(device) 
+            step_start = time.time()
+            if panda_step % CONTROL_RATE == 0:
+                # current panda data loading
+                q_current_pos, x_current_pos, context_current = state_loading(panda,data)
+                
+                # load context to cuda
+                x_current = torch.tensor(context_current).to(device) 
 
-            # data saving
-            q_pos_memory[sampling_step,:] = q_current_pos.reshape(7)
-            x_pos_memory[sampling_step,:] = x_current_pos.reshape(3)
-            abs_dis_memory[sampling_step,:] = np.linalg.norm(x_current_pos - TARGET_POS)
+                # data saving
+                q_pos_memory[sampling_step,:] = q_current_pos.reshape(7)
+                x_pos_memory[sampling_step,:] = x_current_pos.reshape(3)
+                abs_dis_memory[sampling_step,:] = np.linalg.norm(x_current_pos - TARGET_POS)
 
-            # sampling
-            single_start = time.time()
-            inputs_normalized_iters = diffusion_sampling(x_current, dataset, model, n_support_points)
-            single_end = time.time()
-            single_t = single_end - single_start 
-            print(f'single time -- {single_t}')
-            single_time_set[sampling_step,0] = single_t
+                # sampling
+                single_start = time.time()
+                inputs_normalized_iters = diffusion_sampling(x_current, dataset, model, n_support_points)
+                single_end = time.time()
+                single_t = single_end - single_start 
+                print(f'single time -- {single_t}')
+                single_time_set[sampling_step,0] = single_t
 
-            # last diffusion result unmormalize
-            inputs_iters = dataset.unnormalize_states(inputs_normalized_iters)
-            inputs_final = inputs_iters[-1] # 1 128 7
-            print(f'control_policy -- {inputs_final.shape}')
-            print(f'\n--------------------------------------\n')
+                # last diffusion result unmormalize
+                inputs_iters = dataset.unnormalize_states(inputs_normalized_iters)
+                inputs_final = inputs_iters[-1] # 1 128 7
+                print(f'control_policy -- {inputs_final.shape}')
+                print(f'\n--------------------------------------\n')
 
-            x_current = x_current.cpu() # copy cuda tensor at first to cpu
-            # x0_array = np.squeeze(x_current.numpy()) # matrix (1*20) to vector (20)
+                x_current = x_current.cpu() # copy cuda tensor at first to cpu
+                # x0_array = np.squeeze(x_current.numpy()) # matrix (1*20) to vector (20)
 
-            # horizon_inputs = np.zeros((1, HORIZON, 7))
-            inputs_final = inputs_final.cpu()
-            diffusion_predicted_states = diffusion_horizon_states(x_current_pos, inputs_final, q_current_pos)
-            cost = mpc_cost(diffusion_predicted_states, inputs_final, Q, R, P)
-            cost_memory[sampling_step,0] = cost
+                # horizon_inputs = np.zeros((1, HORIZON, 7))
+                inputs_final = inputs_final.cpu()
+                diffusion_predicted_states = diffusion_horizon_states(x_current_pos, inputs_final, q_current_pos)
+                cost = mpc_cost(diffusion_predicted_states, inputs_final, Q, R, P)
+                cost_memory[sampling_step,0] = cost
 
-            # for n in range(0,HORIZON):
-            #     horizon_inputs[0,n,:] = round(inputs_final[0,n,:].item(),4)
-            # print(f'horizon_inputs -- {horizon_inputs}')
-            applied_input_tensor = inputs_final[0,0,:]
-            applied_input_array = applied_input_tensor.numpy()
-            # applied_input = round(applied_input_array.item(),4) # retain 4 decimal places
-            print(f'applied_input -- {applied_input_array}')
-            ctl_memory[sampling_step,:] = applied_input_array 
+                # for n in range(0,HORIZON):
+                #     horizon_inputs[0,n,:] = round(inputs_final[0,n,:].item(),4)
+                # print(f'horizon_inputs -- {horizon_inputs}')
+                applied_input_tensor = inputs_final[0,0,:]
+                applied_input_array = applied_input_tensor.numpy()
+                # applied_input = round(applied_input_array.item(),4) # retain 4 decimal places
+                print(f'applied_input -- {applied_input_array}')
+                ctl_memory[sampling_step,:] = applied_input_array 
 
-            # Panda states updating
-            data.ctrl[:7] = applied_input_array
-            # mujoco.mj_step(panda, data)
+                # Panda states updating
+                data.ctrl[:7] = applied_input_array
+                mujoco.mj_step(panda, data)
 
-            # q_current_pos, x_current_pos, x_next = state_updating(panda, data)
-            # x_current = x_next
-            print(f'current x pos -- {x_current[0,14:17]}')
-            print(f'sampling step -- {sampling_step}')
-            sampling_step = sampling_step + 1
+                # q_current_pos, x_current_pos, x_next = state_updating(panda, data)
+                # x_current = x_next
+                print(f'current x pos -- {x_current[0,14:17]}')
+                print(f'sampling step -- {sampling_step}')
+                sampling_step = sampling_step + 1
 
-        mujoco.mj_step(panda, data)
-        if panda_step == SAMPLING_STEPS*CONTROL_RATE-1 :
-            q_last_pos, x_last_pos, context_last = state_loading(panda,data)
-            print(f'final panda x pos -- {x_last_pos}')
+            mujoco.mj_step(panda, data)
+            viewer.sync()
+            # frame = viewer.read_pixels()
+            # frames.append(frame)
+
+            time_until_next_step = panda.opt.timestep - (time.time() - step_start)
+            if time_until_next_step > 0:
+                    time.sleep(time_until_next_step)
+
+            if panda_step == SAMPLING_STEPS*CONTROL_RATE-1 :
+                q_last_pos, x_last_pos, context_last = state_loading(panda,data)
+                print(f'final panda x pos -- {x_last_pos}')
+                
+                # mujoco.mj_step(panda, data)   # Step the simulation forward
+
+                # viewer.sync()  # Update the viewer window
+                # time.sleep(0.01)  # Sim time regulation (adjust as needed)
         
     end_time = time.time()
     delta_t_problem_solving = end_time - start_time
+    # imageio.mimsave('simulation.gif', frames, fps=30)
 
     # final position difference
     print(f'----------------------------------------------------')
@@ -175,8 +207,8 @@ def main():
 
     ########################## plot ##########################
     # joint_name = 'qPOS' + str(ini_joint_states[0,0]) + '_' +  str(ini_joint_states[0,1]) + '_' + str(ini_joint_states[0,2]) + '_' + str(ini_joint_states[0,3]) + '_' + str(ini_joint_states[0,4]) + '_' + str(ini_joint_states[0,5]) + '_' + str(ini_joint_states[0,6]) + '_0test_pdf'
-    joint_name = 'cost' + '_collecting_sample_16'
-    figure_saving_path = os.path.join(RESULTS_SAVED_PATH, joint_name)
+    joint_name = 'Franka_Panda_Diffusion_Sample'
+    figure_saving_path = os.path.join(RESULTS_SAVING_PATH, joint_name)
     os.makedirs(figure_saving_path, exist_ok=True)
 
     # save states trajectory
@@ -481,7 +513,7 @@ def mpc_cost(predicted_states, predicted_controls, Q, R, P):
     return cost
 
 def diffusion_horizon_states(x_current_pos, inputs_final, q_current_pos):
-    panda_cost = mujoco.MjModel.from_xml_path('/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/Panda/xml/mjx_scene.xml')
+    panda_cost = mujoco.MjModel.from_xml_path(xml_path)
     data_cost = mujoco.MjData(panda_cost)
     data_cost.qpos[:7] = q_current_pos.reshape(7)
     mujoco.mj_step(panda_cost, data_cost)
