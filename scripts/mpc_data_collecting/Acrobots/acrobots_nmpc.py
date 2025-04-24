@@ -11,7 +11,7 @@ import scipy.linalg
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver, AcadosSimSolver
 
 MAX_CORE_CPU = 1  # 16
-FOLDER_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/mpc_data_collecting/Acrobots'
+FOLDER_PATH = '/root/cartpoleDiff/cart_pole_diffusion_based_on_MPD/scripts/mpc_data_collecting/Acrobots/figure/neg2pipos2pi'
 
 ##### Acrobot Parameters (Gym) #####
 LINK_LENGTH_1 = 1.0  # [m]
@@ -22,14 +22,14 @@ LINK_COM_POS_1 = 0.5  #: [m] position of the center of mass of link 1
 LINK_COM_POS_2 = 0.5  #: [m] position of the center of mass of link 2
 LINK_MOI = 1.0  #: moments of inertia for both links
 G = 9.81 # [m/s^2]
-U_BOUND = 50
+U_BOUND = 300
 
 
 ##### MPC parameters #####
-CONTROL_STEPS = 400
+CONTROL_STEPS = 300
 
 # (for 1 time solving)
-N = 256 # mpc prediction horizon
+N = 128 # mpc prediction horizon
 TS = 0.01
 TF = N*TS
 
@@ -38,12 +38,14 @@ NUM_U = 1 # tau
 IDX_THETA1_INI = 0
 IDX_THETA2_INI = 1
 
-X_GUESS = [-np.pi, np.pi]
-U_GUESS = [-40, 40]
+X_GUESS = [-np.pi, np.pi] # [-np.pi, np.pi]
+THETHA_1_GUESS_RANGE = np.linspace(-2*np.pi, 2*np.pi, 5)
+THETHA_2_GUESS_RANGE = np.linspace(-2*np.pi, 2*np.pi, 5)
+U_GUESS = [-40,40]
 
 ##### cost function weights #####
 "Q = np.diag([0.1, 10, 10, 0.1]), R = 0.1, P = np.diag([1, 1, 1, 1])"
-Q = np.diag([0.1, 0.1, 10, 10]) # np.diag([0.01, 0.01, 1, 1, 10, 10])   np.diag([1, 1, 10, 10])
+Q = np.diag([0.1, 0.1, 1, 1]) # np.diag([0.01, 0.01, 1, 1, 10, 10])   np.diag([1, 1, 10, 10])
 Q_E = np.diag([1, 1, 100, 100])  # np.diag([0.01, 0.01, 10, 10, 1000, 1000])   np.diag([10, 10, 1000, 1000])
 R = 0.1
 # Q, R --> W for Acado ocp
@@ -61,11 +63,11 @@ X_REF_TERMINAL = np.array([0, 0, 0, 0]) # 6 states X_REF = np.array([np.pi, 0, 0
 # X_REF_INI= np.array([np.pi, 0, 0, 0, 0, 0, 0, 0]) # 6 states + 1 u
 
 # initial data range
-NUM_INITIAL_THETA1 = 3
-Theta1_INITIAL_RANGE = np.linspace(-np.pi/2,np.pi/2, NUM_INITIAL_THETA1) 
+NUM_INITIAL_THETA1 = 1
+Theta1_INITIAL_RANGE = np.linspace(0,0, NUM_INITIAL_THETA1)  # np.linspace(-np.pi/2,np.pi/2, NUM_INITIAL_THETA1) 
 
 NUM_INITIAL_THETA2 = 3
-Theta2_INITIAL_RANGE = np.linspace(-np.pi/2,np.pi/2, NUM_INITIAL_THETA2) 
+Theta2_INITIAL_RANGE = np.linspace(-np.pi/4,np.pi/4, NUM_INITIAL_THETA2)  # np.linspace(-np.pi/2,np.pi/2, NUM_INITIAL_THETA2) 
 
 # rng_theta1 = np.concatenate([Theta1_INITIAL_RANGE_1, Theta1_INITIAL_RANGE_2])
 # rng_theta2 = np.concatenate([Theta2_INITIAL_RANGE_1, Theta2_INITIAL_RANGE_2])
@@ -79,9 +81,18 @@ num_datagroup = len(rng0)
 print(f'rng0 -- {rng0.shape}')
 
 # initial guess
+guess_rng0 = []
+for g_idx1 in THETHA_1_GUESS_RANGE:
+    for g_idx2 in THETHA_2_GUESS_RANGE:
+        guess_rng0.append([g_idx1,g_idx2])
+guess_rng0= np.array(guess_rng0)
+num_guessgroup = len(guess_rng0)
+print(f'guess_rng0 -- {guess_rng0.shape}')
+
 INITIAL_GUESS_NUM = 2
-initial_guess_x = X_GUESS
+initial_guess_x = guess_rng0
 initial_guess_u = U_GUESS
+num_u_guessgroup = len(initial_guess_u)
 
 # Theta star
 PI_UNDER_2 = 2/np.pi
@@ -388,13 +399,13 @@ def Acado_ocp_solver(x0):
    ocp.constraints.x0 = x0 # initial states
 
     
-   ocp.constraints.lbx = np.array([-2*np.pi, -2*np.pi]) # , -4*np.pi, -9*np.pi
-   ocp.constraints.ubx = np.array([2*np.pi, 2*np.pi]) # , 4*np.pi, 9*np.pi
+   ocp.constraints.lbx = np.array([-2*np.pi, -2*np.pi]) # , -4*np.pi, -9*np.pi # np.array([-2*np.pi, -2*np.pi])
+   ocp.constraints.ubx = np.array([2*np.pi, 2*np.pi]) # , 4*np.pi, 9*np.pi # np.array([-2*np.pi, -2*np.pi])
    ocp.constraints.idxbx = np.array([0, 1])  # 2 constraints
 
-   ocp.constraints.lbu = np.array([-U_BOUND])
-   ocp.constraints.ubu = np.array([U_BOUND])
-   ocp.constraints.idxbu = np.array([0])
+   # ocp.constraints.lbu = np.array([-U_BOUND])
+   # ocp.constraints.ubu = np.array([U_BOUND])
+   # ocp.constraints.idxbu = np.array([0])
 
    # solver setting
    ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
@@ -410,8 +421,6 @@ def Acado_ocp_solver(x0):
    acados_integrator = AcadosSimSolver(ocp, json_file = "acados_ocp_acrobots.json")
 
    return ocp, acados_solver, acados_integrator
-
-
 
 
 
@@ -433,11 +442,15 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         U_result = np.zeros((CONTROL_STEPS, nu))
         X_result[0, :] = x0_state
         print(f'x0 -- {x0_state}')
+        print(f'idx_group_of_control_step -- {idx_group_of_control_step}')
+
+        # cost
+        cost = np.zeros((CONTROL_STEPS, 1))
 
         # initial guess
         print(f'u guess -- {u_ini_guess}')
         print(f'x guess -- {x_ini_guess}')
-        x_guess = np.array([x_ini_guess, x_ini_guess, 0, 0, Theta1ToThetaStar1(x_ini_guess), Theta2ToThetaStar2(x_ini_guess)])
+        x_guess = np.array([x_ini_guess[0], x_ini_guess[1], 0, 0, Theta1ToThetaStar1(x_ini_guess[0]), Theta2ToThetaStar2(x_ini_guess[1])])
         u_guess = u_ini_guess
     
         # set initial guess
@@ -445,6 +458,8 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         ocp_solver.set(0, "x", x_guess)
         ocp_solver.set(0, "lbx", x0_state)
         ocp_solver.set(0, "ubx", x0_state)
+        # cost_0 = ocp_solver.get_cost()
+        # cost[0,:] = cost_0
 
         # ocp solving
         for i in range(0, CONTROL_STEPS):
@@ -465,6 +480,8 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
 
             u_solve = ocp_solver.get(0, "u")  
             U_result[i,:] = u_solve
+            cost_solve = ocp_solver.get_cost()
+            cost[i,:] = cost_solve
 
             # state updating
             # integrator.set("x", X_result[i, :])
@@ -481,10 +498,11 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         
         print(f'X_last_result -- {X_result[-1,:]}')
         print(f'U_last_result -- {U_result[-1,:]}')
+        print(f'cost_last_result -- {cost[-1,:]}')
 
         time = np.arange(X_result.shape[0])  # time steps
 
-        fig, axs = plt.subplots(7, 1, figsize=(6, 10), sharex=True)
+        fig, axs = plt.subplots(8, 1, figsize=(8, 12), sharex=True)
 
         state_labels = [
             'theta1 (rad)',
@@ -504,12 +522,22 @@ def RunMPCForSingle_IniState_IniGuess(x_ini_guess: float, u_ini_guess:float,idx_
         # Plot control input
         axs[6].plot(time[:-1], U_result[:, 0], label='Torque u', color='r')
         axs[6].set_ylabel('Control u (Nm)')
-        axs[6].set_xlabel('Time step')
+        # axs[6].set_xlabel('Time step')
         axs[6].grid(True)
+
+        # Plot control input
+        axs[7].plot(time[:-1], cost[:, 0], label='Cost', color='r')
+        axs[7].set_ylabel('Cost')
+        axs[7].set_xlabel('Time step')
+        axs[7].grid(True)
 
         plt.suptitle('Acrobot States and Control Input Over Time')
         plt.legend()
-        figure_name = 'idx-' + str(idx_group_of_control_step) + '_x0_' + str(x0_state[0]) + '_' + str(x0_state[1]) + '.pdf'
+        ini_theta1 = f'{x0_state[0]:.2f}'
+        ini_theta2 = f'{x0_state[1]:.2f}'
+        guess_1 = f'{x_ini_guess[0]:.2f}'
+        guess_2 = f'{x_ini_guess[1]:.2f}'
+        figure_name = 'idx-' + str(idx_group_of_control_step) + '_x0_' + ini_theta1 + '_' + ini_theta2 + '_x-guess_' + guess_1 + '_' + guess_2 + '.pdf'
         figure_path = os.path.join(FOLDER_PATH, figure_name)
         plt.savefig(figure_path)
         # plt.tight_layout(rect=[0, 0.03, 1, 0.97])
@@ -647,11 +675,11 @@ def main():
 
     # initial data groups 50
     argument_each_group = []
-    for idx_ini_guess in range(0, INITIAL_GUESS_NUM): 
+    for idx_ini_guess in range(0, num_guessgroup): 
         for turn in range(0,num_datagroup):
             # initial guess
-            x_ini_guess = initial_guess_x[idx_ini_guess]
-            u_ini_guess = initial_guess_u[idx_ini_guess]
+            x_ini_guess = initial_guess_x[idx_ini_guess,:] # initial_guess_x[idx_ini_guess,:]
+            u_ini_guess = 10 # initial_guess_u[idx_ini_guess]
             idx_group_of_control_step = idx_ini_guess*num_datagroup+turn
             
             #initial states
